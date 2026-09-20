@@ -16,7 +16,11 @@ def to_change(s: pd.Series, kind: str) -> pd.Series:
     """
     s = s.dropna().sort_index()
     if kind == PRICE_LIKE:
-        return np.log(s / s.shift(1)).dropna()
+        # A log return is undefined at a non-positive price: WTI settled at
+        # -$37.63 on 2020-04-20. Mask those ratios so the undefined
+        # observations are dropped explicitly rather than via a numpy warning.
+        ratio = s / s.shift(1)
+        return np.log(ratio.where(ratio > 0)).dropna()
     if kind == RATE_LIKE:
         return s.diff().dropna()
     raise ValueError(f"unknown series kind: {kind!r}")

@@ -1,3 +1,5 @@
+import warnings
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -23,6 +25,15 @@ def test_price_like_becomes_log_return():
     out = to_change(s, PRICE_LIKE)
     assert len(out) == 1
     assert out.iloc[0] == pytest.approx(np.log(1.1))
+
+
+def test_price_like_drops_non_positive_prices_without_warning():
+    s = pd.Series([50.0, -37.0, 20.0, 25.0], index=dates(4))
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        out = to_change(s, PRICE_LIKE)
+    assert len(out) == 1
+    assert out.index[0] == dates(4)[3]
 
 
 def test_rate_like_becomes_first_difference_in_native_units():
