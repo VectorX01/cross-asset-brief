@@ -497,3 +497,13 @@ def test_the_live_board_quotes_vix_in_points_and_the_curve_spread_in_basis_point
     assert SERIES["credit"].quote == "bp"
     assert SERIES["ust10"].quote == "yield"
     assert SERIES["equity"].quote == "price"
+
+
+def test_a_range_whose_low_is_negative_reads_as_to_rather_than_a_dash():
+    """"-3–100bp" puts a minus sign against an en dash and reads as a typo."""
+    row = _row(key="3m10y", quote="bp", level=0.82, low_1y=-0.03, high_1y=1.00)
+    assert range_text(row) == "-3 to 100bp"
+
+
+def test_a_wholly_positive_range_keeps_the_compact_dash():
+    assert range_text(_row(quote="yield", low_1y=3.55, high_1y=4.81)) == "3.55–4.81"

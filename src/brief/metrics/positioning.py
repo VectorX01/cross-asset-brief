@@ -138,7 +138,7 @@ divergence = register(
         interpret=_interpret_divergence,
         unit="pctile pts",
         why=(
-            f"Where {DIVERGENCE_CATEGORY} positioning in "
+            f"Where {CONTRACTS[DIVERGENCE_CONTRACT].trader_category} positioning in "
             f"{CONTRACTS[DIVERGENCE_CONTRACT].label} futures sits in its three-year "
             "range, minus where the index price sits in its three-month range."
         ),

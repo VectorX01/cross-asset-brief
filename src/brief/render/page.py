@@ -48,14 +48,19 @@ def change_text(value: float | None, quote: str) -> str:
 
 
 def range_text(row) -> str:
-    """The trailing-year low and high, in the row's own convention."""
+    """The trailing-year low and high, in the row's own convention.
+
+    A negative low takes "to" rather than an en dash: "-3–100bp" sets a
+    minus sign against a dash and reads as a typo.
+    """
+    joiner = " to " if row.low_1y < 0 else "–"
     if row.quote == "price":
-        return f"{row.low_1y:,.0f}–{row.high_1y:,.0f}"
+        return f"{row.low_1y:,.0f}{joiner}{row.high_1y:,.0f}"
     if row.quote == "bp":
-        return f"{row.low_1y * 100:,.0f}–{row.high_1y * 100:,.0f}bp"
+        return f"{row.low_1y * 100:,.0f}{joiner}{row.high_1y * 100:,.0f}bp"
     if row.quote == "points":
-        return f"{row.low_1y:.1f}–{row.high_1y:.1f}"
-    return f"{row.low_1y:.2f}–{row.high_1y:.2f}"
+        return f"{row.low_1y:.1f}{joiner}{row.high_1y:.1f}"
+    return f"{row.low_1y:.2f}{joiner}{row.high_1y:.2f}"
 
 
 def _environment() -> Environment:

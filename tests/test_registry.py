@@ -59,3 +59,13 @@ def test_explanations_are_prose_not_restatements_of_the_title():
         if m.why.strip().lower().rstrip(".") == m.title.strip().lower()
     ]
     assert echoes == []
+
+
+def test_the_divergence_explanation_names_its_trader_category_in_lower_case():
+    """The category is capitalised where it opens an interpretation sentence.
+    Reusing that form mid-sentence in `why` reads as a proper noun."""
+    from brief.config import CONTRACTS
+
+    why = REGISTRY["divergence"].why
+    assert CONTRACTS["es"].trader_category in why
+    assert CONTRACTS["es"].trader_category.capitalize() not in why
