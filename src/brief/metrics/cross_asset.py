@@ -99,8 +99,8 @@ def _interpret_comovement(value: float, pctile: float) -> str:
         )
     return (
         f"Mean pairwise correlation {value:.2f} — {ordinal(pctile)} percentile of "
-        "its own history, neither an unusually single-factor tape nor an "
-        "unusually idiosyncratic one."
+        "its own history, neither unusually single-factor nor unusually "
+        "idiosyncratic."
     )
 
 

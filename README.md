@@ -87,8 +87,10 @@ not be.
 
 A source that fails degrades the page rather than blanking it: `load_levels`
 catches per-series fetch errors and the affected tiles render
-`"unavailable — <reason>"` instead of taking the whole build down. A stale
-tile still renders — with an underline — rather than disappearing.
+`"unavailable — <reason>"` instead of taking the whole build down. A metric
+whose series is too short to produce a percentile says so too, rather than
+rendering a number with no context. A stale tile still renders — marked
+with the word "stale" and a dotted underline — rather than disappearing.
 
 Staleness tolerance is per-series, not a single global cutoff, because
 publication lag is a property of each series, not of the metrics that
