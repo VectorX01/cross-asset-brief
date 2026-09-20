@@ -54,3 +54,51 @@ def test_stock_bond_interpretation_names_the_regime():
     assert "not hedging" in positive
     assert "hedging" in negative and "not hedging" not in negative
     assert "+0.41" in positive
+
+
+def test_credit_vs_vol_is_positive_when_credit_is_the_stressed_one():
+    idx = pd.bdate_range("2015-01-01", periods=1400)
+    credit = pd.Series(np.linspace(3.0, 9.0, 1400), index=idx)
+    vix = pd.Series(np.linspace(30.0, 12.0, 1400), index=idx)
+    out = REGISTRY["credit_vs_vol"].fn({"credit": credit, "vix": vix})
+    assert out.iloc[-1] > 50
+
+
+def test_credit_vs_vol_is_negative_when_equity_vol_is_the_stressed_one():
+    idx = pd.bdate_range("2015-01-01", periods=1400)
+    credit = pd.Series(np.linspace(9.0, 3.0, 1400), index=idx)
+    vix = pd.Series(np.linspace(12.0, 30.0, 1400), index=idx)
+    out = REGISTRY["credit_vs_vol"].fn({"credit": credit, "vix": vix})
+    assert out.iloc[-1] < -50
+
+
+def test_credit_vs_vol_interpretation_names_the_stressed_market():
+    assert "credit" in REGISTRY["credit_vs_vol"].interpret(62.0, 91.0).lower()
+    assert "vol" in REGISTRY["credit_vs_vol"].interpret(-62.0, 8.0).lower()
+
+
+def test_comovement_is_high_when_every_asset_shares_one_driver():
+    idx = pd.bdate_range("2015-01-01", periods=300)
+    rng = np.random.default_rng(3)
+    shock = rng.normal(size=300)
+    levels = {
+        "equity": pd.Series(100 * np.exp(np.cumsum(shock * 0.01)), index=idx),
+        "ust10": pd.Series(4.0 + np.cumsum(shock * 0.02), index=idx),
+        "usd": pd.Series(100 * np.exp(np.cumsum(shock * 0.005)), index=idx),
+        "credit": pd.Series(4.0 + np.cumsum(shock * 0.01), index=idx),
+        "wti": pd.Series(70 * np.exp(np.cumsum(shock * 0.02)), index=idx),
+        "vix": pd.Series(18.0 + np.cumsum(shock * 0.05), index=idx),
+    }
+    out = REGISTRY["comovement"].fn(levels)
+    assert out.iloc[-1] > 0.9
+
+
+def test_comovement_is_low_when_assets_are_independent():
+    idx = pd.bdate_range("2015-01-01", periods=300)
+    rng = np.random.default_rng(4)
+    levels = {
+        name: pd.Series(100 + np.cumsum(rng.normal(size=300)), index=idx)
+        for name in ("equity", "ust10", "usd", "credit", "wti", "vix")
+    }
+    out = REGISTRY["comovement"].fn(levels)
+    assert out.iloc[-1] < 0.4
