@@ -52,3 +52,37 @@ def source_of(key: str) -> str:
     if key in SERIES:
         return "FRED"
     raise KeyError(f"unknown levels key: {key}")
+
+
+@dataclass(frozen=True)
+class ContractDef:
+    report: str          # "tff" or "disagg"
+    market_code: str     # exact market_and_exchange_names value
+    label: str
+    price_series: str | None   # key into SERIES, or None if no free daily price
+
+
+# price_series for "es" is "spx" (S&P 500), not "equity" (Nasdaq Composite):
+# SERIES["equity"] became NASDAQCOM after FRED dropped the Wilshire index,
+# and "spx" -> SP500 was added specifically to pair with this contract.
+# Pairing E-mini S&P positioning against a Nasdaq price would be wrong.
+#
+# wti's market_code is "WTI-PHYSICAL", not "CRUDE OIL, LIGHT SWEET": CFTC
+# renamed the flagship NYMEX WTI contract on 2022-02-08 (confirmed via the
+# live API — "CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE" has no
+# reports after 2022-02-01; "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE"
+# has the same ~2M-contract open interest starting the next report week and
+# continues to the present. It is the same contract under its current name.
+CONTRACTS: dict[str, ContractDef] = {
+    "es": ContractDef(
+        "tff", "E-MINI S&P 500 - CHICAGO MERCANTILE EXCHANGE", "E-mini S&P 500", "spx"
+    ),
+    "ust10": ContractDef(
+        "tff", "UST 10Y NOTE - CHICAGO BOARD OF TRADE", "10y Treasury note", "ust10"
+    ),
+    "dxy": ContractDef("tff", "USD INDEX - ICE FUTURES U.S.", "US Dollar Index", "usd"),
+    "gold": ContractDef("disagg", "GOLD - COMMODITY EXCHANGE INC.", "Gold", None),
+    "wti": ContractDef(
+        "disagg", "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE", "WTI crude", "wti"
+    ),
+}
