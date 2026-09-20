@@ -83,7 +83,7 @@
     <p class="value">{{ "%+.0f"|format(payload.setup.value) }}</p>
     {{ strip(payload.setup.pctile) }}
     <p class="sentence">{{ payload.setup.sentence }}</p>
-    <p class="asof">as of {{ payload.setup.as_of }}</p>
+    <p class="asof {% if payload.setup.stale %}stale{% endif %}">as of {{ payload.setup.as_of }} · {{ payload.setup.sources | join(", ") }}</p>
   </section>
   {% endif %}
 

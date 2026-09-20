@@ -165,3 +165,44 @@ def test_unusual_and_setup_sections_render_with_a_correctly_suffixed_ordinal():
     assert "Setup" in html
     assert "72nd" in html
     assert "72th" not in html
+
+
+def test_load_levels_keeps_going_when_one_source_fails(monkeypatch):
+    import brief.pipeline as pipeline
+
+    def fake_fred(series_id, api_key=None):
+        if series_id == "VIXCLS":
+            raise RuntimeError("HTTP 503")
+        return pd.Series([1.0, 2.0], index=pd.bdate_range("2026-01-01", periods=2))
+
+    def fake_cot(contract_key):
+        return pd.Series([1.0, 2.0], index=pd.bdate_range("2026-01-01", periods=2))
+
+    monkeypatch.setattr(pipeline, "fetch", fake_fred)
+    monkeypatch.setattr("brief.sources.cftc.fetch", fake_cot)
+
+    levels, status = pipeline.load_levels()
+
+    assert "vix" not in levels
+    assert "equity" in levels and "ust10" in levels
+    assert any("VIXCLS" in key or "vix" in key for key in status)
+    assert any("503" in message for message in status.values())
+
+
+def test_a_stale_setup_tile_is_marked_stale_in_its_own_section():
+    stale_tile = Tile(
+        name="divergence", title="Positioning-price divergence", value=5.0, pctile=90.0,
+        sentence="setup sentence", history=[1.0, 2.0], as_of="2020-01-01",
+        unit="pctile pts", sources=("CFTC", "FRED"), stale=True,
+    )
+    payload = {
+        "date": "2020-01-01",
+        "tiles": [stale_tile],
+        "unusual": [],
+        "setup": stale_tile,
+        "source_status": {},
+    }
+    html = render(payload)
+    setup_section = html.split("<h2>Setup</h2>")[1].split("<h2>Metrics</h2>")[0]
+    assert 'class="asof stale"' in setup_section
+    assert "CFTC" in setup_section and "FRED" in setup_section
