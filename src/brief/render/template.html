@@ -64,6 +64,8 @@
   .board-level { font-size:17px; font-variant-numeric:tabular-nums; }
   .board-move { font-size:12px; font-variant-numeric:tabular-nums; }
   .board-sep { color:var(--muted); }
+  .board-stale { font-size:11px; color:var(--muted);
+                 text-decoration:underline dotted; margin-top:2px; }
   .board-range { font-size:11px; color:var(--muted);
                  font-variant-numeric:tabular-nums; margin-top:2px; }
   /* The explanation is closed by default: it is there when you want it and
@@ -120,6 +122,9 @@
         <span class="board-move">{{ change(row.change_1d, row.quote) }} <span class="board-sep">1d</span></span>
         <span class="board-move">{{ change(row.change_1m, row.quote) }} <span class="board-sep">1m</span></span>
         <span class="board-range">{{ span(row) }}</span>
+        {% if row.stale %}
+        <span class="board-stale" title="no newer observation has published yet">as of {{ row.as_of }} · stale</span>
+        {% endif %}
       </div>
     {% endfor %}
     </div>

@@ -24,6 +24,7 @@ NOTABLE_PCTILE = 90.0
 # How a number is written on the board. Deliberately separate from `kind`,
 # which decides the differencing rule: VIX is rate-like for the maths (first
 # differences) but is quoted in vol points, and nobody writes 2s10s as 0.27.
+QUOTES = frozenset({"price", "yield", "bp", "points"})
 QUOTE_FOR_KIND = {PRICE_LIKE: "price", RATE_LIKE: "yield"}
 
 
@@ -42,6 +43,11 @@ class SeriesDef:
     def __post_init__(self):
         if self.quote is None:
             object.__setattr__(self, "quote", QUOTE_FOR_KIND[self.kind])
+        elif self.quote not in QUOTES:
+            # Unknown quotes would fall through the formatters' default and
+            # render as a yield -- silently, which is how a 2.27-point VIX
+            # move once printed as -227bp.
+            raise ValueError(f"{self.fred_id}: unknown quote {self.quote!r}")
 
 
 # equity: WILL5000IND is gone from FRED entirely (confirmed 400 on both

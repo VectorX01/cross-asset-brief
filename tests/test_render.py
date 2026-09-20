@@ -386,7 +386,7 @@ def _row(**overrides):
     base = dict(
         key="ust10", label="10y", kind=RATE_LIKE, quote="yield", level=3.98,
         change_1d=0.02, change_1m=-0.11, low_1y=3.55, high_1y=4.81,
-        as_of="2026-09-18",
+        as_of="2026-09-18", stale_after_days=5, stale=False,
     )
     base.update(overrides)
     return BoardRow(**base)
@@ -507,3 +507,33 @@ def test_a_range_whose_low_is_negative_reads_as_to_rather_than_a_dash():
 
 def test_a_wholly_positive_range_keeps_the_compact_dash():
     assert range_text(_row(quote="yield", low_1y=3.55, high_1y=4.81)) == "3.55–4.81"
+
+
+def test_an_unrecognised_quote_is_rejected_rather_than_rendered_as_a_yield():
+    """A typo must not silently format as percent-and-basis-points, which is
+    the failure class that produced a 2.27-point VIX move rendered as -227bp."""
+    from brief.config import SeriesDef
+
+    with pytest.raises(ValueError, match="quote"):
+        SeriesDef("DGS10", "10y", RATE_LIKE, quote="yeild")
+
+
+def test_a_stale_board_row_says_so_with_its_date():
+    from brief.levels import BoardSection
+
+    payload = build_payload(synthetic_levels())
+    payload["board"] = [
+        BoardSection(title="Other", rows=(_row(key="usd", stale=True, as_of="2026-09-11"),))
+    ]
+    html = render(payload)
+    assert "as of 2026-09-11" in html
+    assert "board-stale" in html
+
+
+def test_a_fresh_board_row_carries_no_date_and_no_marker():
+    from brief.levels import BoardSection
+
+    payload = build_payload(synthetic_levels())
+    payload["board"] = [BoardSection(title="Other", rows=(_row(stale=False),))]
+    html = render(payload)
+    assert 'class="board-stale"' not in html

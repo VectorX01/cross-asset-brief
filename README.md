@@ -109,6 +109,14 @@ not be.
 
 ## Staleness and failure handling
 
+The board applies the same rule as the tiles, per series. A row whose newest
+observation is older than that series' own observed publication lag prints its
+date and is marked stale; a row within its lag prints nothing. The broad dollar
+index genuinely publishes about nine days in arrears, so a uniform gate would
+have marked it stale permanently — and a warning that is always lit is one the
+reader stops seeing.
+
+
 A source that fails degrades the page rather than blanking it: `load_levels`
 catches per-series fetch errors and the affected tiles render
 `"unavailable — <reason>"` instead of taking the whole build down. A metric

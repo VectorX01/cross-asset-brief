@@ -10,6 +10,7 @@ holidays and publication gaps and "a month ago" should mean a month ago.
 """
 
 from dataclasses import dataclass
+from datetime import date, timedelta
 
 import pandas as pd
 
@@ -32,6 +33,8 @@ class BoardRow:
     low_1y: float
     high_1y: float
     as_of: str
+    stale_after_days: int
+    stale: bool
 
 
 def _move(latest: float, earlier: float, kind: str) -> float:
@@ -45,7 +48,9 @@ def _move(latest: float, earlier: float, kind: str) -> float:
     return latest - earlier
 
 
-def board_row(series: pd.Series, *, key: str, label: str, kind: str, quote: str) -> BoardRow:
+def board_row(
+    series: pd.Series, *, key: str, label: str, kind: str, quote: str, stale_after_days: int
+) -> BoardRow:
     """One row of the board, or ValueError if there is nothing to show."""
     observed = series.dropna().sort_index()
     if observed.empty:
@@ -72,6 +77,8 @@ def board_row(series: pd.Series, *, key: str, label: str, kind: str, quote: str)
         low_1y=float(trailing_year.min()),
         high_1y=float(trailing_year.max()),
         as_of=str(last_date.date()),
+        stale_after_days=stale_after_days,
+        stale=(date.today() - last_date.date()) > timedelta(days=stale_after_days),
     )
 
 
@@ -113,7 +120,14 @@ def build_board(
                 continue
             try:
                 rows[title].append(
-                    board_row(series, key=key, label=definition.label, kind=definition.kind, quote=definition.quote)
+                    board_row(
+                        series,
+                        key=key,
+                        label=definition.label,
+                        kind=definition.kind,
+                        quote=definition.quote,
+                        stale_after_days=definition.stale_after_days,
+                    )
                 )
             except ValueError:
                 continue
@@ -125,7 +139,18 @@ def build_board(
         if series is None:
             continue
         try:
-            rows[title].append(board_row(series, key=label, label=label, kind=RATE_LIKE, quote="bp"))
+            rows[title].append(board_row(
+                    series,
+                    key=label,
+                    label=label,
+                    kind=RATE_LIKE,
+                    quote="bp",
+                    # A spread cannot be fresher than its slowest leg.
+                    stale_after_days=max(
+                        SERIES[short_key].stale_after_days,
+                        SERIES[long_key].stale_after_days,
+                    ),
+                ))
         except ValueError:
             continue
 
