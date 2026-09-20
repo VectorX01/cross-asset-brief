@@ -11,15 +11,15 @@ from brief.pipeline import (
     _tile_for,
     build_payload,
 )
-from brief.render.page import format_value, render
+from brief.render.page import change_text, format_value, level_text, range_text, render
 from brief.render.svg import percentile_strip, sparkline
+from brief.transforms import PRICE_LIKE, RATE_LIKE
 
 
 def _metric(inputs):
     return Metric(
         name="probe", title="Probe", inputs=inputs, context_window=None,
-        fn=lambda levels: None, interpret=lambda value, pctile: "", unit="",
-    )
+        fn=lambda levels: None, interpret=lambda value, pctile: "", unit="", why="probe", implication="probe",)
 
 
 def tile_named(payload, name):
@@ -92,8 +92,7 @@ def test_tile_for_catches_a_metric_that_raises_mid_computation():
 
     metric = Metric(
         name="boom", title="Boom", inputs=("equity",), context_window=None,
-        fn=boom, interpret=lambda value, pctile: "never reached", unit="",
-    )
+        fn=boom, interpret=lambda value, pctile: "never reached", unit="", why="probe", implication="probe",)
     tile = _tile_for(metric, synthetic_levels())
     assert tile.value is None
     assert "metric exploded" in tile.error
@@ -142,8 +141,7 @@ def test_a_genuinely_ancient_tile_is_still_marked_stale_even_with_a_wide_gate():
         Metric(
             name="usd_only", title="USD only", inputs=("usd",), context_window=None,
             fn=lambda levels: levels["usd"],
-            interpret=lambda value, pctile: "n/a", unit="",
-        ),
+            interpret=lambda value, pctile: "n/a", unit="", why="probe", implication="probe",),
         old_levels,
     )
     assert tile.stale is True
@@ -160,8 +158,7 @@ def test_unusual_and_setup_sections_render_with_a_correctly_suffixed_ordinal():
     tile = Tile(
         name="stock_bond", title="Stock/bond", value=0.5, pctile=72.0,
         sentence="an unusual reading", history=[1.0, 2.0], as_of="2021-01-01",
-        unit="", context="since 1971", sources=("FRED",),
-    )
+        unit="", context="since 1971", sources=("FRED",), why="w", implication="i",)
     payload = {
         "date": "2021-01-01",
         "tiles": [tile],
@@ -202,8 +199,7 @@ def test_a_stale_setup_tile_is_marked_stale_in_its_own_section():
     stale_tile = Tile(
         name="divergence", title="Positioning-price divergence", value=5.0, pctile=90.0,
         sentence="setup sentence", history=[1.0, 2.0], as_of="2020-01-01",
-        unit="pctile pts", context="since 2006", sources=("CFTC", "FRED"), stale=True,
-    )
+        unit="pctile pts", context="since 2006", sources=("CFTC", "FRED"), stale=True, why="w", implication="i",)
     payload = {
         "date": "2020-01-01",
         "tiles": [stale_tile],
@@ -224,8 +220,7 @@ def test_tile_for_survives_a_metric_that_returns_an_empty_series():
     metric = Metric(
         name="empty", title="Empty", inputs=("equity",), context_window=None,
         fn=lambda levels: pd.Series(dtype=float, index=pd.DatetimeIndex([])),
-        interpret=lambda value, pctile: "never reached", unit="",
-    )
+        interpret=lambda value, pctile: "never reached", unit="", why="probe", implication="probe",)
     tile = _tile_for(metric, synthetic_levels())
     assert tile.value is None
     assert tile.error
@@ -239,8 +234,7 @@ def test_tile_for_marks_a_series_too_short_to_rank_unavailable():
     metric = Metric(
         name="one_point", title="One point", inputs=("equity",), context_window=None,
         fn=lambda levels: pd.Series([1.0], index=idx),
-        interpret=lambda value, pctile: "never reached", unit="",
-    )
+        interpret=lambda value, pctile: "never reached", unit="", why="probe", implication="probe",)
     tile = _tile_for(metric, synthetic_levels())
     assert tile.value is None
     assert tile.pctile is None
@@ -261,8 +255,7 @@ def test_a_windowed_tile_states_its_window_not_its_start_year():
     metric = Metric(
         name="windowed", title="Windowed", inputs=("equity",), context_window=156,
         fn=lambda levels: pd.Series(np.arange(400, dtype=float), index=weekly),
-        interpret=lambda value, pctile: "n/a", unit="",
-    )
+        interpret=lambda value, pctile: "n/a", unit="", why="probe", implication="probe",)
     tile = _tile_for(metric, synthetic_levels())
     assert tile.context == "of the last 3 years"
 
@@ -274,8 +267,7 @@ def test_a_window_longer_than_the_history_reports_the_history_it_has():
     metric = Metric(
         name="short_history", title="Short", inputs=("equity",), context_window=156,
         fn=lambda levels: pd.Series(np.arange(80, dtype=float), index=weekly),
-        interpret=lambda value, pctile: "n/a", unit="",
-    )
+        interpret=lambda value, pctile: "n/a", unit="", why="probe", implication="probe",)
     assert _tile_for(metric, synthetic_levels()).context == "since 2025"
 
 
@@ -283,7 +275,7 @@ def _tile(**overrides):
     fields = dict(
         name="t", title="T", value=1.0, pctile=50.0, sentence="s",
         history=[1.0, 2.0], as_of="2026-09-20", unit="", context="since 2020",
-        sources=("FRED",),
+        why="what it measures", implication="what to conclude", sources=("FRED",),
     )
     fields.update(overrides)
     return Tile(**fields)
@@ -336,12 +328,12 @@ def test_the_setup_block_is_chosen_by_role_not_by_metric_name():
     renamed = M(
         name="renamed_setup", title="Renamed", inputs=("equity",), context_window=None,
         fn=lambda levels: levels["equity"], interpret=lambda value, pctile: "s",
-        unit="corr", role="setup",
+        unit="corr", why="probe", implication="probe", role="setup",
     )
     ordinary = M(
         name="ordinary", title="Ordinary", inputs=("equity",), context_window=None,
         fn=lambda levels: levels["equity"], interpret=lambda value, pctile: "s",
-        unit="corr",
+        unit="corr", why="probe", implication="probe",
     )
     fake_registry = {"ordinary": ordinary, "renamed_setup": renamed}
     with pytest.MonkeyPatch.context() as patch:
@@ -384,3 +376,124 @@ def test_a_stale_tile_says_the_word_not_just_a_dotted_underline():
     assert 'class="asof stale"' in html
     assert "· stale" in html
     assert "title=" in html.split('class="asof stale"')[1][:120]
+
+
+# --- levels board rendering ------------------------------------------------
+
+def _row(**overrides):
+    from brief.levels import BoardRow
+
+    base = dict(
+        key="ust10", label="10y", kind=RATE_LIKE, quote="yield", level=3.98,
+        change_1d=0.02, change_1m=-0.11, low_1y=3.55, high_1y=4.81,
+        as_of="2026-09-18",
+    )
+    base.update(overrides)
+    return BoardRow(**base)
+
+
+def test_a_yield_reads_in_percent_and_its_move_in_basis_points():
+    assert level_text(_row()) == "3.98"
+    assert change_text(0.02, "yield") == "+2bp"
+    assert change_text(-0.115, "yield") == "-12bp"
+
+
+def test_a_price_reads_with_separators_and_its_move_in_percent():
+    assert level_text(_row(kind=PRICE_LIKE, quote="price", level=23041.23)) == "23,041.2"
+    assert change_text(0.42, "price") == "+0.4%"
+
+
+def test_a_missing_move_renders_a_dash_rather_than_a_zero():
+    assert change_text(None, "yield") == "—"
+
+
+def test_the_year_range_reads_low_to_high_in_the_row_s_own_units():
+    assert range_text(_row()) == "3.55–4.81"
+    assert range_text(_row(kind=PRICE_LIKE, quote="price", level=1.0, low_1y=18000.0, high_1y=23500.0)) == "18,000–23,500"
+
+
+def test_the_board_renders_its_sections_rows_and_ranges():
+    from brief.levels import BoardSection
+
+    payload = build_payload(synthetic_levels())
+    payload["board"] = [BoardSection(title="Treasury curve", rows=(_row(),))]
+    html = render(payload)
+    assert "Treasury curve" in html
+    assert "3.98" in html
+    assert "3.55–4.81" in html
+    assert "+2bp" in html
+
+
+def test_an_absent_board_does_not_break_the_page():
+    html = render(build_payload(synthetic_levels()))
+    assert html.startswith("<!doctype html>")
+
+
+# --- per-metric explanation ------------------------------------------------
+
+def test_a_tile_carries_its_why_and_implication_into_the_page():
+    payload = build_payload(synthetic_levels())
+    html = render(payload)
+    metric = REGISTRY["stock_bond"]
+    assert metric.why in html
+    assert metric.implication in html
+
+
+def test_the_explanation_is_collapsed_behind_a_disclosure_not_always_open():
+    html = render(build_payload(synthetic_levels()))
+    assert "<details" in html
+    assert "<details open" not in html
+
+
+def test_an_unavailable_tile_still_explains_what_the_metric_would_have_shown():
+    payload = build_payload({"equity": synthetic_levels()["equity"]})
+    html = render(payload)
+    assert REGISTRY["stock_bond"].why in html
+
+
+def test_build_payload_assembles_the_levels_board_from_the_loaded_series():
+    payload = build_payload(synthetic_levels())
+    titles = [section.title for section in payload["board"]]
+    assert "Equities" in titles
+    keys = [row.key for section in payload["board"] for row in section.rows]
+    assert "equity" in keys and "ust10" in keys
+
+
+def test_the_board_omits_sections_whose_series_all_failed_to_load():
+    payload = build_payload({"equity": synthetic_levels()["equity"]})
+    titles = [section.title for section in payload["board"]]
+    assert titles == ["Equities"]
+
+
+# --- quote conventions -----------------------------------------------------
+# `kind` decides the differencing rule; `quote` decides how a number is
+# written. They are not the same question: VIX is rate-like for the maths
+# (first differences) but is quoted in vol points, never basis points.
+
+def test_a_yield_is_quoted_in_percent_with_a_basis_point_move():
+    row = _row(quote="yield", level=4.94, change_1d=-0.07)
+    assert level_text(row) == "4.94"
+    assert change_text(row.change_1d, row.quote) == "-7bp"
+
+
+def test_a_spread_is_quoted_in_basis_points_not_as_a_decimal():
+    row = _row(key="2s10s", quote="bp", level=0.27, change_1d=-0.25, low_1y=0.27, high_1y=0.74)
+    assert level_text(row) == "27bp"
+    assert change_text(row.change_1d, row.quote) == "-25bp"
+    assert range_text(row) == "27–74bp"
+
+
+def test_volatility_is_quoted_in_points_not_basis_points():
+    row = _row(key="vix", quote="points", level=15.44, change_1d=-2.27, low_1y=13.47, high_1y=31.05)
+    assert level_text(row) == "15.44"
+    assert change_text(row.change_1d, row.quote) == "-2.27"
+    assert range_text(row) == "13.5–31.1"
+
+
+def test_the_live_board_quotes_vix_in_points_and_the_curve_spread_in_basis_points():
+    from brief.config import SERIES
+
+    assert SERIES["vix"].quote == "points"
+    assert SERIES["credit"].quote == "bp"
+    assert SERIES["ust10"].quote == "yield"
+    assert SERIES["equity"].quote == "price"

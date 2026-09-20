@@ -6,6 +6,7 @@ from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from brief.render.svg import percentile_strip, sparkline
 from brief.text import ordinal
+from brief.transforms import PRICE_LIKE
 
 TEMPLATE_DIR = Path(__file__).parent
 
@@ -25,6 +26,38 @@ def format_value(value: float, unit: str) -> str:
     return UNIT_FORMATS.get(unit, lambda v: f"{v:+.2f}")(value)
 
 
+def level_text(row) -> str:
+    """The number as a desk would write it."""
+    if row.quote == "price":
+        return f"{row.level:,.1f}"
+    if row.quote == "bp":
+        return f"{row.level * 100:,.0f}bp"
+    return f"{row.level:.2f}"
+
+
+def change_text(value: float | None, quote: str) -> str:
+    """No move is an em dash: "only one observation" and "it did not move"
+    are different facts and the board should not conflate them."""
+    if value is None:
+        return "—"
+    if quote == "price":
+        return f"{value:+.1f}%"
+    if quote == "points":
+        return f"{value:+.2f}"
+    return f"{value * 100:+.0f}bp"
+
+
+def range_text(row) -> str:
+    """The trailing-year low and high, in the row's own convention."""
+    if row.quote == "price":
+        return f"{row.low_1y:,.0f}–{row.high_1y:,.0f}"
+    if row.quote == "bp":
+        return f"{row.low_1y * 100:,.0f}–{row.high_1y * 100:,.0f}bp"
+    if row.quote == "points":
+        return f"{row.low_1y:.1f}–{row.high_1y:.1f}"
+    return f"{row.low_1y:.2f}–{row.high_1y:.2f}"
+
+
 def _environment() -> Environment:
     env = Environment(
         loader=FileSystemLoader(TEMPLATE_DIR),
@@ -36,6 +69,9 @@ def _environment() -> Environment:
     env.globals["spark"] = lambda values: _markup(sparkline(values))
     env.filters["ordinal"] = ordinal
     env.globals["value"] = format_value
+    env.globals["level"] = level_text
+    env.globals["change"] = change_text
+    env.globals["span"] = range_text
     return env
 
 

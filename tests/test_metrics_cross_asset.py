@@ -18,8 +18,7 @@ def test_register_rejects_a_metric_without_an_interpretation():
             inputs=("equity",),
             context_window=None,
             fn=lambda levels: pd.Series(dtype=float),
-            unit="",
-        )
+            unit="", why="probe", implication="probe",)
 
 
 def test_register_rejects_a_duplicate_name():
