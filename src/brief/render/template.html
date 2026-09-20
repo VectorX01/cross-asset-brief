@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cross-asset brief — {{ payload.date }}</title>
+<style>
+  /* Palette from the dataviz skill's reference instance (references/palette.md):
+     page plane, primary/secondary/muted ink, gridline hairline and primary-ink
+     marker, used unchanged — no new hues are introduced, so no palette
+     validation run was needed (only pre-validated neutral tokens are used). */
+  :root {
+    --bg: #f9f9f7;          /* page plane, light */
+    --fg: #0b0b0b;          /* primary ink */
+    --text-2: #52514e;      /* secondary ink */
+    --muted: #898781;       /* muted ink (axis/labels), mode-invariant */
+    --rule: #e1e0d9;        /* gridline hairline */
+    --mark: #0b0b0b;        /* primary-ink marker on the percentile strip */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0d0d;        /* page plane, dark */
+      --fg: #ffffff;        /* primary ink, dark */
+      --text-2: #c3c2b7;    /* secondary ink, dark */
+      --rule: #2c2c2a;      /* gridline hairline, dark */
+      --mark: #ffffff;      /* primary-ink marker, dark */
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg);
+         font:15px/1.5 ui-sans-serif, -apple-system, system-ui, sans-serif; }
+  main { max-width: 820px; margin:0 auto; padding: 32px 20px 64px; }
+  header { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+           padding-bottom:12px; border-bottom:1px solid var(--rule); }
+  h1 { font-size:15px; font-weight:600; margin:0; letter-spacing:0.01em; }
+  .meta { color:var(--text-2); font-size:13px; }
+  h2 { font-size:11px; font-weight:600; letter-spacing:0.09em; text-transform:uppercase;
+       color:var(--muted); margin:40px 0 12px; }
+  ol { margin:0; padding-left:20px; }
+  ol li { margin-bottom:10px; }
+  .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:28px 32px; }
+  @media (max-width:640px) { .grid { grid-template-columns:1fr; } }
+  .tile { border-top:1px solid var(--rule); padding-top:12px; }
+  .tile h3 { font-size:14px; font-weight:600; margin:0 0 6px; }
+  .value { font-size:24px; margin:0; }
+  .pct { color:var(--text-2); font-size:13px; }
+  .sentence { margin:8px 0 0; }
+  .asof { color:var(--muted); font-size:12px; margin-top:8px; }
+  .stale { text-decoration:underline dotted; }
+  .strip-bg { fill:var(--rule); }
+  .strip-mark { stroke:var(--mark); stroke-width:2; }
+  .spark polyline { stroke:var(--text-2); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Cross-asset brief</h1>
+    <span class="meta">{{ payload.date }}</span>
+  </header>
+
+  <h2>Metrics</h2>
+  <div class="grid">
+  {% for tile in payload.tiles %}
+    <section class="tile">
+      <h3>{{ tile.title }}</h3>
+      {% if tile.error %}
+        <p class="sentence">unavailable — {{ tile.error }}</p>
+      {% else %}
+        <p class="value">{{ "%+.2f"|format(tile.value) }}</p>
+        {{ strip(tile.pctile) }}
+        <p class="pct">{{ "%.0f"|format(tile.pctile) }}th percentile</p>
+        {{ spark(tile.history) }}
+        <p class="sentence">{{ tile.sentence }}</p>
+        <p class="asof {% if tile.stale %}stale{% endif %}">as of {{ tile.as_of }}</p>
+      {% endif %}
+    </section>
+  {% endfor %}
+  </div>
+</main>
+</body>
+</html>
