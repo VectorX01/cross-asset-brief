@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from brief.sources.cftc import CftcError, parse_positions, splice
+from brief.sources.cftc import FIELDS, CftcError, parse_positions, splice
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -28,7 +28,6 @@ def test_net_position_is_long_minus_short():
     rows = json.loads((FIXTURES / "cftc_tff.json").read_text())
     s = parse_positions(rows, "tff")
     row = rows[0]
-    from brief.sources.cftc import FIELDS
 
     date_field = "report_date_as_yyyy_mm_dd"
     long_field, short_field = FIELDS["tff"]
@@ -65,3 +64,21 @@ def test_splice_rejects_overlapping_dates():
     b = parse_positions(rows, "tff")  # same dates as `a` -> overlap
     with pytest.raises(CftcError, match="overlapping"):
         splice([a, b])
+
+
+def test_parse_skips_rows_missing_the_position_fields():
+    rows = json.loads((FIXTURES / "cftc_tff.json").read_text())
+    incomplete = dict(rows[0])
+    long_field, short_field = FIELDS["tff"]
+    del incomplete[long_field]
+    s = parse_positions([incomplete, *rows[1:]], "tff")
+    assert len(s) == len(rows) - 1
+
+
+def test_parse_raises_when_no_row_carries_the_position_fields():
+    rows = json.loads((FIXTURES / "cftc_tff.json").read_text())
+    stripped = [
+        {k: v for k, v in row.items() if k not in FIELDS["tff"]} for row in rows
+    ]
+    with pytest.raises(CftcError):
+        parse_positions(stripped, "tff")
