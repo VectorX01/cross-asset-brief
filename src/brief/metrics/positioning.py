@@ -5,10 +5,11 @@ import pandas as pd
 
 from brief.config import (
     CONTRACTS,
-    DIVERGENCE_THRESHOLD,
+    DIVERGENCE_PCTILE,
     POSITIONING_WINDOW_YEARS,
 )
 from brief.metrics.registry import Metric, register
+from brief.text import ordinal
 from brief.transforms import percentile_rank
 
 WEEKS_PER_YEAR = 52
@@ -29,16 +30,16 @@ def _interpret_positioning(label: str):
         side = "long" if value > 0 else "short"
         if pctile >= 90:
             return (
-                f"{label}: net {side} {abs(value):,.0f} contracts, {pctile:.0f}th "
+                f"{label}: net {side} {abs(value):,.0f} contracts, {ordinal(pctile)} "
                 "percentile of three years — a crowded position."
             )
         if pctile <= 10:
             return (
-                f"{label}: net {side} {abs(value):,.0f} contracts, {pctile:.0f}th "
+                f"{label}: net {side} {abs(value):,.0f} contracts, {ordinal(pctile)} "
                 "percentile of three years — a crowded position on the other side."
             )
         return (
-            f"{label}: net {side} {abs(value):,.0f} contracts, {pctile:.0f}th "
+            f"{label}: net {side} {abs(value):,.0f} contracts, {ordinal(pctile)} "
             "percentile of three years."
         )
 
@@ -80,15 +81,17 @@ def _divergence(levels: dict[str, pd.Series]) -> pd.Series:
 
 
 def _interpret_divergence(value: float, pctile: float) -> str:
-    if value >= DIVERGENCE_THRESHOLD:
+    if pctile >= DIVERGENCE_PCTILE:
         return (
             f"Leveraged funds are {value:.0f} percentile points longer than price "
-            "justifies — a rally without sponsorship, vulnerable to long liquidation."
+            f"justifies ({ordinal(pctile)} percentile of its own history) — a rally "
+            "without sponsorship, vulnerable to long liquidation."
         )
-    if value <= -DIVERGENCE_THRESHOLD:
+    if pctile <= 100 - DIVERGENCE_PCTILE:
         return (
             f"Leveraged funds are {abs(value):.0f} percentile points shorter than "
-            "price justifies — a selloff without capitulation, vulnerable to a squeeze."
+            f"price justifies ({ordinal(pctile)} percentile of its own history) — a "
+            "selloff without capitulation, vulnerable to a squeeze."
         )
     return (
         f"Positioning and price agree within {abs(value):.0f} percentile points — "

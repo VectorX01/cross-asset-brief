@@ -64,3 +64,17 @@ def test_divergence_is_negative_when_positioning_is_short_into_strong_price():
 def test_divergence_interpretation_describes_the_setup():
     assert "sponsorship" in REGISTRY["divergence"].interpret(70.0, 97.0).lower()
     assert "capitulation" in REGISTRY["divergence"].interpret(-70.0, 2.0).lower()
+
+
+def test_divergence_interprets_by_percentile_not_raw_value():
+    # A large raw spread that is only mid-pack relative to its own history is
+    # not a trade setup -- the old value-based threshold called this "notable"
+    # regardless of how unusual it actually was, contradicting the ranker.
+    neutral = REGISTRY["divergence"].interpret(70.0, 50.0).lower()
+    assert "sponsorship" not in neutral
+    assert "capitulation" not in neutral
+
+    # A modest raw spread that sits in the extreme tail of its own history IS
+    # a trade setup -- this is exactly the case the old threshold missed.
+    extreme = REGISTRY["divergence"].interpret(20.0, 95.0).lower()
+    assert "sponsorship" in extreme

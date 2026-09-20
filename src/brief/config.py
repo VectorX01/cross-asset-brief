@@ -8,7 +8,11 @@ CORR_WINDOW = 60
 POSITIONING_WINDOW_YEARS = 3
 STRESS_WINDOW_YEARS = 5
 TRADING_DAYS_PER_YEAR = 252
-DIVERGENCE_THRESHOLD = 50.0
+# Symmetric band on the divergence metric's OWN percentile history (not a raw
+# value): the tile speaks only when today's spread sits in either tail of how
+# that spread has behaved historically. Percentile is the only vocabulary --
+# a threshold on raw percentile-point magnitude would compare unlike things.
+DIVERGENCE_PCTILE = 90.0
 
 
 @dataclass(frozen=True)

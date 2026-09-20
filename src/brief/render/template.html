@@ -63,7 +63,7 @@
   {% if payload.unusual %}
   <ol>
     {% for tile in payload.unusual %}
-      <li>{{ tile.sentence }} <span class="pct">({{ "%.0f"|format(tile.pctile) }}th pct)</span></li>
+      <li>{{ tile.sentence }} <span class="pct">({{ tile.pctile | ordinal }} pct)</span></li>
     {% endfor %}
   </ol>
   {% else %}
@@ -91,7 +91,7 @@
       {% else %}
         <p class="value">{{ "%+.2f"|format(tile.value) }}</p>
         {{ strip(tile.pctile) }}
-        <p class="pct">{{ "%.0f"|format(tile.pctile) }}th percentile</p>
+        <p class="pct">{{ tile.pctile | ordinal }} percentile</p>
         {{ spark(tile.history) }}
         <p class="sentence">{{ tile.sentence }}</p>
         <p class="asof {% if tile.stale %}stale{% endif %}">as of {{ tile.as_of }} · {{ tile.sources | join(", ") }}</p>
