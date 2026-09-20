@@ -10,6 +10,7 @@ from brief.config import (
     TRADING_DAYS_PER_YEAR,
 )
 from brief.metrics.registry import Metric, register
+from brief.text import ordinal
 from brief.transforms import (
     align,
     mean_abs_pairwise_corr,
@@ -90,7 +91,10 @@ def _interpret_comovement(value: float, pctile: float) -> str:
             f"Mean pairwise correlation {value:.2f} — assets are telling unrelated "
             "stories, so single-name and relative-value risk dominates."
         )
-    return f"Mean pairwise correlation {value:.2f} — unremarkable co-movement."
+    return (
+        f"Mean pairwise correlation {value:.2f} — {ordinal(pctile)} percentile of "
+        "its own history."
+    )
 
 
 credit_vs_vol = register(

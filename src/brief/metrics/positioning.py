@@ -93,9 +93,17 @@ def _interpret_divergence(value: float, pctile: float) -> str:
             f"price justifies ({ordinal(pctile)} percentile of its own history) — a "
             "selloff without capitulation, vulnerable to a squeeze."
         )
+    if round(value) == 0:
+        return (
+            "Leveraged funds are within a percentile point of what price alone "
+            f"would suggest — {ordinal(pctile)} percentile of this relationship's "
+            "own history."
+        )
+    direction = "longer" if value > 0 else "shorter"
     return (
-        f"Positioning and price agree within {abs(value):.0f} percentile points — "
-        "no divergence worth trading."
+        f"Leveraged funds sit {abs(value):.0f} percentile points {direction} than "
+        f"price alone would suggest — {ordinal(pctile)} percentile of this "
+        "relationship's own history."
     )
 
 

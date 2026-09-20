@@ -78,3 +78,20 @@ def test_divergence_interprets_by_percentile_not_raw_value():
     # a trade setup -- this is exactly the case the old threshold missed.
     extreme = REGISTRY["divergence"].interpret(20.0, 95.0).lower()
     assert "sponsorship" in extreme
+
+
+def test_divergence_middle_branch_is_neutral_not_a_dismissal():
+    # A mid-percentile reading can still be the day's most unusual metric once
+    # ranked against the other eight -- the sentence must not claim there is
+    # nothing worth trading while the ranker highlights it as notable, nor
+    # smuggle in the tail branches' trade language.
+    sentence = REGISTRY["divergence"].interpret(70.0, 50.0)
+    lowered = sentence.lower()
+    assert "no divergence worth trading" not in lowered
+    assert "sponsorship" not in lowered
+    assert "capitulation" not in lowered
+    assert "50th" in sentence
+
+    near_zero = REGISTRY["divergence"].interpret(0.2, 50.0).lower()
+    assert "longer" not in near_zero
+    assert "shorter" not in near_zero

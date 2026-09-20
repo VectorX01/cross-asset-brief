@@ -102,3 +102,16 @@ def test_comovement_is_low_when_assets_are_independent():
     }
     out = REGISTRY["comovement"].fn(levels)
     assert out.iloc[-1] < 0.4
+
+
+def test_comovement_middle_branch_is_neutral_not_a_dismissal():
+    # A mid-percentile reading can still be the day's most unusual metric once
+    # ranked against the other eight -- the sentence must not tell the reader
+    # it is unremarkable while the ranker highlights it as notable.
+    sentence = REGISTRY["comovement"].interpret(0.34, 50.0)
+    lowered = sentence.lower()
+    assert "unremarkable" not in lowered
+    assert "not working" not in lowered
+    assert "dominates" not in lowered
+    assert "50th" in sentence
+    assert "0.34" in sentence
