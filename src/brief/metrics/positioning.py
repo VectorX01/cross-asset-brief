@@ -28,20 +28,18 @@ def _positioning_fn(contract_key: str):
 def _interpret_positioning(label: str):
     def interpret(value: float, pctile: float) -> str:
         side = "long" if value > 0 else "short"
-        if pctile >= 90:
-            return (
-                f"{label}: net {side} {abs(value):,.0f} contracts, {ordinal(pctile)} "
-                "percentile of three years — a crowded position."
-            )
-        if pctile <= 10:
-            return (
-                f"{label}: net {side} {abs(value):,.0f} contracts, {ordinal(pctile)} "
-                "percentile of three years — a crowded position on the other side."
-            )
-        return (
-            f"{label}: net {side} {abs(value):,.0f} contracts, {ordinal(pctile)} "
-            "percentile of three years."
+        # The window is read from the constant at call time rather than
+        # written out as prose: the sentence cannot drift from the window the
+        # percentile was actually computed over.
+        head = (
+            f"{label}: net {side} {abs(value):,.0f} contracts, "
+            f"{ordinal(pctile)} percentile of {POSITIONING_WINDOW_YEARS} years"
         )
+        if pctile >= 90:
+            return f"{head} — a crowded position."
+        if pctile <= 10:
+            return f"{head} — a crowded position on the other side."
+        return f"{head}."
 
     return interpret
 

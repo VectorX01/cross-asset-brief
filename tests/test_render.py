@@ -151,7 +151,7 @@ def test_unusual_and_setup_sections_render_with_a_correctly_suffixed_ordinal():
     tile = Tile(
         name="stock_bond", title="Stock/bond", value=0.5, pctile=72.0,
         sentence="an unusual reading", history=[1.0, 2.0], as_of="2021-01-01",
-        unit="", sources=("FRED",),
+        unit="", context="since 1971", sources=("FRED",),
     )
     payload = {
         "date": "2021-01-01",
@@ -193,7 +193,7 @@ def test_a_stale_setup_tile_is_marked_stale_in_its_own_section():
     stale_tile = Tile(
         name="divergence", title="Positioning-price divergence", value=5.0, pctile=90.0,
         sentence="setup sentence", history=[1.0, 2.0], as_of="2020-01-01",
-        unit="pctile pts", sources=("CFTC", "FRED"), stale=True,
+        unit="pctile pts", context="since 2006", sources=("CFTC", "FRED"), stale=True,
     )
     payload = {
         "date": "2020-01-01",
@@ -236,3 +236,35 @@ def test_tile_for_marks_a_series_too_short_to_rank_unavailable():
     assert tile.value is None
     assert tile.pctile is None
     assert "percentile" in tile.error
+
+
+def test_a_full_history_tile_states_the_year_its_context_starts():
+    # "18th percentile" is the abstraction the spec set out to avoid: the 18th
+    # percentile of one year and of forty are different claims. The window is
+    # derived from the data actually loaded, never hardcoded.
+    tile = _tile_for(REGISTRY["stock_bond"], synthetic_levels())
+    assert tile.context == "since 2020"
+    assert tile.context in render(build_payload(synthetic_levels()))
+
+
+def test_a_windowed_tile_states_its_window_not_its_start_year():
+    weekly = pd.date_range("2016-01-05", periods=400, freq="W-TUE")
+    metric = Metric(
+        name="windowed", title="Windowed", inputs=("equity",), context_window=156,
+        fn=lambda levels: pd.Series(np.arange(400, dtype=float), index=weekly),
+        interpret=lambda value, pctile: "n/a", unit="",
+    )
+    tile = _tile_for(metric, synthetic_levels())
+    assert tile.context == "of the last 3 years"
+
+
+def test_a_window_longer_than_the_history_reports_the_history_it_has():
+    # Claiming a three-year window over eighteen months of data would be the
+    # hardcoded-prose bug in another form.
+    weekly = pd.date_range("2025-01-07", periods=80, freq="W-TUE")
+    metric = Metric(
+        name="short_history", title="Short", inputs=("equity",), context_window=156,
+        fn=lambda levels: pd.Series(np.arange(80, dtype=float), index=weekly),
+        interpret=lambda value, pctile: "n/a", unit="",
+    )
+    assert _tile_for(metric, synthetic_levels()).context == "since 2025"

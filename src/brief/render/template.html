@@ -70,7 +70,17 @@
   {% if payload.unusual %}
   <ol>
     {% for tile in payload.unusual %}
-      <li>{{ tile.sentence }} <span class="pct">({{ tile.pctile | ordinal }} pct)</span></li>
+      {# The percentile is appended only where the sentence does not already
+         carry it: several interpretations state it themselves, and "...80th
+         percentile of this relationship's own history. (80th pct)" on the
+         five most-read lines of the page is worse than either half alone.
+         Where it is appended it brings the context window with it, which no
+         sentence states. #}
+      <li>{{ tile.sentence }}
+        {% if (tile.pctile | ordinal) not in tile.sentence %}
+        <span class="pct">({{ tile.pctile | ordinal }} pct {{ tile.context }})</span>
+        {% endif %}
+      </li>
     {% endfor %}
   </ol>
   {% else %}
@@ -98,7 +108,7 @@
       {% else %}
         <p class="value">{{ "%+.2f"|format(tile.value) }}</p>
         {{ strip(tile.pctile) }}
-        <p class="pct">{{ tile.pctile | ordinal }} percentile</p>
+        <p class="pct">{{ tile.pctile | ordinal }} percentile {{ tile.context }}</p>
         {{ spark(tile.history) }}
         <p class="sentence">{{ tile.sentence }}</p>
         <p class="asof {% if tile.stale %}stale{% endif %}">as of {{ tile.as_of }} · {{ tile.sources | join(", ") }}</p>

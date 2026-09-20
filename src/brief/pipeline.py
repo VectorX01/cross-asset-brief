@@ -28,6 +28,7 @@ class Tile:
     history: list[float]
     as_of: str
     unit: str
+    context: str
     sources: tuple[str, ...]
     error: str | None = None
     stale: bool = False
@@ -73,6 +74,24 @@ def _staleness_gate(metric) -> int:
     return max(tolerance(name) for name in metric.inputs)
 
 
+def _context_label(series: pd.Series, window: int | None) -> str:
+    """What this tile's percentile is a percentile *of*.
+
+    Derived from the data actually loaded, never hardcoded: "18th percentile"
+    alone is the abstraction the design set out to avoid, since the 18th
+    percentile of one year and of forty are different claims and the reader
+    cannot tell them apart. A window wider than the history available reports
+    the history that is actually there.
+    """
+    if window is None or window >= len(series):
+        return f"since {series.index[0].year}"
+    span = series.index[-1] - series.index[-window]
+    years = span.days / 365.25
+    if years >= 1:
+        return f"of the last {round(years)} years"
+    return f"of the last {round(span.days / 30.44)} months"
+
+
 def _unavailable(metric, reason: str) -> Tile:
     """A tile that says why it has no number, rather than rendering blank."""
     return Tile(
@@ -84,6 +103,7 @@ def _unavailable(metric, reason: str) -> Tile:
         history=[],
         as_of="",
         unit=metric.unit,
+        context="",
         sources=_sources_for(metric),
         error=reason,
     )
@@ -118,6 +138,7 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
             history=[float(v) for v in series.iloc[-SPARK_POINTS:]],
             as_of=str(last),
             unit=metric.unit,
+            context=_context_label(series, metric.context_window),
             sources=_sources_for(metric),
             stale=stale,
         )

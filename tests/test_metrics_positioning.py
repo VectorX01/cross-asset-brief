@@ -95,3 +95,16 @@ def test_divergence_middle_branch_is_neutral_not_a_dismissal():
     near_zero = REGISTRY["divergence"].interpret(0.2, 50.0).lower()
     assert "longer" not in near_zero
     assert "shorter" not in near_zero
+
+
+def test_positioning_sentence_derives_its_window_from_the_constant(monkeypatch):
+    # The window was prose: "percentile of three years" as a string literal
+    # that POSITIONING_WINDOW_YEARS did not control, so changing the constant
+    # would have left the page asserting a window it no longer used.
+    from brief.metrics import positioning as positioning_module
+
+    assert "3 years" in REGISTRY["pos_es"].interpret(120000.0, 50.0)
+    monkeypatch.setattr(positioning_module, "POSITIONING_WINDOW_YEARS", 7)
+    sentence = REGISTRY["pos_es"].interpret(120000.0, 50.0)
+    assert "7 years" in sentence
+    assert "3 years" not in sentence
