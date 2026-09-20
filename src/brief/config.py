@@ -8,11 +8,17 @@ CORR_WINDOW = 60
 POSITIONING_WINDOW_YEARS = 3
 STRESS_WINDOW_YEARS = 5
 TRADING_DAYS_PER_YEAR = 252
-# Symmetric band on the divergence metric's OWN percentile history (not a raw
-# value): the tile speaks only when today's spread sits in either tail of how
-# that spread has behaved historically. Percentile is the only vocabulary --
-# a threshold on raw percentile-point magnitude would compare unlike things.
-DIVERGENCE_PCTILE = 90.0
+# One symmetric band, in percentile space, for every tile that claims a
+# reading is notable: a tile speaks up only when today's value sits in either
+# tail of its OWN history (not against a raw threshold -- percentile is the
+# only vocabulary, and a threshold on raw magnitude would compare unlike
+# things). 90/10 rather than anything looser because the claim these tiles
+# make in the tails is a strong one ("diversification is not working today",
+# "vulnerable to long liquidation"), and a reading two days in five is not
+# evidence for it: 90/10 fires on roughly one day in five across the two
+# tails combined. Shared by divergence, co-movement and positioning so that
+# "notable" means one thing across the page rather than three.
+NOTABLE_PCTILE = 90.0
 
 
 @dataclass(frozen=True)

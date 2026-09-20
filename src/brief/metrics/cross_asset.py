@@ -5,6 +5,7 @@ import pandas as pd
 from brief.config import (
     COMOVEMENT_BASKET,
     CORR_WINDOW,
+    NOTABLE_PCTILE,
     SERIES,
     STRESS_WINDOW_YEARS,
     TRADING_DAYS_PER_YEAR,
@@ -81,19 +82,25 @@ def _comovement(levels: dict[str, pd.Series]) -> pd.Series:
 
 
 def _interpret_comovement(value: float, pctile: float) -> str:
-    if pctile >= 70:
+    # The band is NOTABLE_PCTILE, shared with the divergence tile, not a pair
+    # of inline literals: the tail sentences make a strong claim, and the old
+    # 70/30 band asserted that diversification was not working on three days
+    # in ten. Outside the tails the sentence describes the reading and leaves
+    # the judgment to the percentile, which carries it everywhere else.
+    if pctile >= NOTABLE_PCTILE:
         return (
             f"Mean pairwise correlation {value:.2f} — assets are trading as one "
             "macro factor, so diversification is not working today."
         )
-    if pctile <= 30:
+    if pctile <= 100 - NOTABLE_PCTILE:
         return (
             f"Mean pairwise correlation {value:.2f} — assets are telling unrelated "
             "stories, so single-name and relative-value risk dominates."
         )
     return (
         f"Mean pairwise correlation {value:.2f} — {ordinal(pctile)} percentile of "
-        "its own history."
+        "its own history, neither an unusually single-factor tape nor an "
+        "unusually idiosyncratic one."
     )
 
 

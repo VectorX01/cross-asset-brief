@@ -5,7 +5,7 @@ import pandas as pd
 
 from brief.config import (
     CONTRACTS,
-    DIVERGENCE_PCTILE,
+    NOTABLE_PCTILE,
     POSITIONING_WINDOW_YEARS,
 )
 from brief.metrics.registry import Metric, register
@@ -35,9 +35,9 @@ def _interpret_positioning(label: str, category: str):
             f"{label}: {category} net {side} {abs(value):,.0f} contracts, "
             f"{ordinal(pctile)} percentile of {POSITIONING_WINDOW_YEARS} years"
         )
-        if pctile >= 90:
+        if pctile >= NOTABLE_PCTILE:
             return f"{head} — a crowded position."
-        if pctile <= 10:
+        if pctile <= 100 - NOTABLE_PCTILE:
             return f"{head} — a crowded position on the other side."
         return f"{head}."
 
@@ -87,13 +87,13 @@ DIVERGENCE_CATEGORY = CONTRACTS[DIVERGENCE_CONTRACT].trader_category.capitalize(
 
 
 def _interpret_divergence(value: float, pctile: float) -> str:
-    if pctile >= DIVERGENCE_PCTILE:
+    if pctile >= NOTABLE_PCTILE:
         return (
             f"{DIVERGENCE_CATEGORY} are {value:.0f} percentile points longer than "
             f"price justifies ({ordinal(pctile)} percentile of its own history) — a "
             "rally without sponsorship, vulnerable to long liquidation."
         )
-    if pctile <= 100 - DIVERGENCE_PCTILE:
+    if pctile <= 100 - NOTABLE_PCTILE:
         return (
             f"{DIVERGENCE_CATEGORY} are {abs(value):.0f} percentile points shorter "
             f"than price justifies ({ordinal(pctile)} percentile of its own history) "

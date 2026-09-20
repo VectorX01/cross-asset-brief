@@ -115,3 +115,38 @@ def test_comovement_middle_branch_is_neutral_not_a_dismissal():
     assert "dominates" not in lowered
     assert "50th" in sentence
     assert "0.34" in sentence
+
+
+def test_comovement_claims_a_single_macro_factor_only_in_the_tail():
+    # At the 75th percentile the tile used to state flatly that
+    # "diversification is not working today" -- a stronger claim than a
+    # 75th-percentile reading supports, and the same defect already fixed for
+    # the divergence metric. The band is the shared 90/10 one.
+    from brief.config import NOTABLE_PCTILE
+
+    assert NOTABLE_PCTILE == 90.0
+    tail = REGISTRY["comovement"].interpret(0.78, 95.0).lower()
+    assert "one macro factor" in tail
+
+    middle = REGISTRY["comovement"].interpret(0.61, 75.0).lower()
+    assert "not working" not in middle
+    assert "one macro factor" not in middle
+
+    low_tail = REGISTRY["comovement"].interpret(0.14, 4.0).lower()
+    assert "unrelated stories" in low_tail
+
+    low_middle = REGISTRY["comovement"].interpret(0.28, 25.0).lower()
+    assert "unrelated stories" not in low_middle
+    assert "dominates" not in low_middle
+
+
+def test_comovement_band_boundaries_are_inclusive():
+    assert "one macro factor" in REGISTRY["comovement"].interpret(0.7, 90.0).lower()
+    assert "unrelated stories" in REGISTRY["comovement"].interpret(0.2, 10.0).lower()
+
+
+def test_comovement_band_comes_from_config_not_a_literal(monkeypatch):
+    from brief.metrics import cross_asset as cross_asset_module
+
+    monkeypatch.setattr(cross_asset_module, "NOTABLE_PCTILE", 60.0)
+    assert "one macro factor" in REGISTRY["comovement"].interpret(0.61, 75.0).lower()

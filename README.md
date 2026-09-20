@@ -51,14 +51,17 @@ count matched exactly, with no gap and no overlap. The fetch raises if a
 splice ever produces an overlapping report date, rather than silently
 double-counting a week.
 
-Positioning-price divergence and the cross-asset comovement tile flag
-notability by **percentile**, not a raw threshold: a symmetric band
-(`DIVERGENCE_PCTILE = 90`) on the divergence metric's *own* percentile
-history, because a threshold on raw percentile-point magnitude would compare
-unlike things. When a tile sits in the middle of its own history, its
-sentence still states the fact — "62nd percentile of its own history" — it
-never claims the reading is unremarkable. The percentile carries the
-judgment; the prose only ever states what happened.
+Every tile that claims a reading is notable flags it by **percentile**, not
+by a raw threshold, and all of them share one symmetric band
+(`NOTABLE_PCTILE = 90`) applied to each metric's *own* percentile history:
+divergence, cross-asset co-movement and the five positioning tiles. A
+threshold on raw magnitude would compare unlike things, and three different
+bands would make "notable" mean three different things on one page. When a
+tile sits in the middle of its own history, its sentence still states the
+fact — "62nd percentile of its own history" — it never claims the reading is
+unremarkable, and equally it never makes a tail-strength claim like
+"diversification is not working today" off a 75th-percentile reading. The
+percentile carries the judgment; the prose only ever states what happened.
 
 ## Why explainable over sophisticated
 
