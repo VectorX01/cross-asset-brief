@@ -28,6 +28,23 @@ def test_positioning_interpretation_calls_out_crowding():
     assert "crowded" not in REGISTRY["pos_es"].interpret(1000.0, 50.0).lower()
 
 
+def test_each_contract_gets_its_own_label_and_series():
+    from brief.config import CONTRACTS
+
+    net_es = pd.Series(np.arange(200, dtype=float), index=weekly(200))
+    net_wti = pd.Series(np.arange(200, dtype=float) * -1.0, index=weekly(200))
+    levels = {"cot_es": net_es, "cot_wti": net_wti}
+
+    assert REGISTRY["pos_es"].fn(levels).iloc[-1] == 199.0
+    assert REGISTRY["pos_wti"].fn(levels).iloc[-1] == -199.0
+
+    es_sentence = REGISTRY["pos_es"].interpret(199.0, 95.0)
+    wti_sentence = REGISTRY["pos_wti"].interpret(-199.0, 95.0)
+    assert CONTRACTS["es"].label in es_sentence
+    assert CONTRACTS["wti"].label in wti_sentence
+    assert CONTRACTS["wti"].label not in es_sentence
+
+
 def test_divergence_is_positive_when_positioning_is_long_into_weak_price():
     idx = pd.bdate_range("2019-01-01", periods=900)
     price = pd.Series(np.linspace(120.0, 90.0, 900), index=idx)
