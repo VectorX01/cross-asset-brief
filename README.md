@@ -1,11 +1,34 @@
 # Cross-asset daily brief
 
-A once-daily macro brief that surfaces what is statistically unusual today
+A macro brief, rebuilt hourly through the US session that surfaces what is statistically unusual today
 rather than what the levels are. Nine metrics, built from two public
 sources — FRED and the CFTC Commitments of Traders — rendered to a single
 static HTML page with no backend and no client-side JavaScript.
 
 ![Screenshot of the rendered brief](docs/img/screenshot.png)
+
+## Where the numbers come from
+
+Two providers, chosen per series rather than by habit:
+
+- **FRED** for the Treasury curve, real yields, breakevens, funding (SOFR,
+  EFFR, IORB) and credit spreads. Official, and far more complete — Yahoo
+  carries only three Treasury tenors.
+- **Yahoo** for equities, crude, gold and FX. FRED's crude series ran three
+  days behind during a week crude fell ten percent, it carries no free daily
+  gold at all, and its FX release runs about nine days in arrears. Used
+  through plain `requests`; the payload is a timestamp array and a close
+  array, so yfinance would add a breakage layer and nothing else.
+- **CFTC** for positioning, as before.
+
+Yahoo is unofficial, which is defensible only if it is checked. Every build
+reconciles the pairs both providers carry — Nasdaq, S&P 500, the 10y, and
+front-month crude against spot Cushing — and the page prints the result.
+
+The comparison is made on the latest date the two sources **share**, never on
+each one's own last observation. Publication lag is not disagreement: compared
+last-to-last, crude looked 11% apart; compared on the date they share, it is a
+1.1% spot-futures basis, which is exactly what it should be.
 
 ## The levels board
 

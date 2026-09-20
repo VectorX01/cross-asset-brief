@@ -387,31 +387,20 @@ def _row(**overrides):
 
     base = dict(
         key="ust10", label="10y", kind=RATE_LIKE, quote="yield", level=3.98,
-        change_1d=0.02, change_1m=-0.11, low_1y=3.55, high_1y=4.81,
+        change_1d=0.02, change_1d_pct=None, change_1m=-0.11, change_1m_pct=None, low_1y=3.55, high_1y=4.81,
         as_of="2026-09-18", stale_after_days=5, stale=False,
     )
     base.update(overrides)
     return BoardRow(**base)
 
 
-def test_a_yield_reads_in_percent_and_its_move_in_basis_points():
-    assert level_text(_row()) == "3.98"
-    assert change_text(0.02, "yield") == "+2bp"
-    assert change_text(-0.115, "yield") == "-12bp"
-
-
-def test_a_price_reads_with_separators_and_its_move_in_percent():
-    assert level_text(_row(kind=PRICE_LIKE, quote="price", level=23041.23)) == "23,041.2"
-    assert change_text(0.42, "price") == "+0.4%"
-
-
 def test_a_missing_move_renders_a_dash_rather_than_a_zero():
-    assert change_text(None, "yield") == "—"
+    assert change_text(None, None, "yield") == "—"
 
 
 def test_the_year_range_reads_low_to_high_in_the_row_s_own_units():
     assert range_text(_row()) == "3.55–4.81"
-    assert range_text(_row(kind=PRICE_LIKE, quote="price", level=1.0, low_1y=18000.0, high_1y=23500.0)) == "18,000–23,500"
+    assert range_text(_row(kind=PRICE_LIKE, quote="index", level=1.0, low_1y=18000.0, high_1y=23500.0)) == "18,000.00–23,500.00"
 
 
 def test_the_board_renders_its_sections_rows_and_ranges():
@@ -475,21 +464,21 @@ def test_the_board_omits_sections_whose_series_all_failed_to_load():
 def test_a_yield_is_quoted_in_percent_with_a_basis_point_move():
     row = _row(quote="yield", level=4.94, change_1d=-0.07)
     assert level_text(row) == "4.94"
-    assert change_text(row.change_1d, row.quote) == "-7bp"
+    assert change_text(row.change_1d, row.change_1d_pct, row.quote) == "-7bp"
 
 
 def test_a_spread_is_quoted_in_basis_points_not_as_a_decimal():
-    row = _row(key="2s10s", quote="bp", level=0.27, change_1d=-0.25, low_1y=0.27, high_1y=0.74)
+    row = _row(key="2s10s", quote="bp", level=0.27, change_1d=-0.25, change_1d_pct=None, low_1y=0.27, high_1y=0.74)
     assert level_text(row) == "27bp"
-    assert change_text(row.change_1d, row.quote) == "-25bp"
+    assert change_text(row.change_1d, row.change_1d_pct, row.quote) == "-25bp"
     assert range_text(row) == "27–74bp"
 
 
 def test_volatility_is_quoted_in_points_not_basis_points():
-    row = _row(key="vix", quote="points", level=15.44, change_1d=-2.27, low_1y=13.47, high_1y=31.05)
+    row = _row(key="vix", quote="points", level=15.44, change_1d=-2.27, change_1d_pct=-12.8, low_1y=13.47, high_1y=31.05)
     assert level_text(row) == "15.44"
-    assert change_text(row.change_1d, row.quote) == "-2.27"
-    assert range_text(row) == "13.5–31.1"
+    assert change_text(row.change_1d, row.change_1d_pct, row.quote) == "-2.27 (-12.8%)"
+    assert range_text(row) == "13.47–31.05"
 
 
 def test_the_live_board_quotes_vix_in_points_and_the_curve_spread_in_basis_points():
@@ -567,3 +556,60 @@ def test_load_levels_fetches_each_series_from_its_declared_source(monkeypatch):
     assert "DGS10" in asked["FRED"] and "SOFR" in asked["FRED"]
     assert "^GSPC" not in asked["FRED"]
     assert status == {}
+
+
+def test_an_equity_index_quotes_points_and_percent_the_way_a_desk_says_it():
+    assert level_text(_row(quote="index", level=7637.75)) == "7,637.75"
+    assert change_text(82.40, 1.09, "index") == "+82.40 (+1.09%)"
+
+
+def test_crude_quotes_to_cents_not_to_a_single_decimal():
+    assert level_text(_row(quote="commodity", level=96.083)) == "96.08"
+    assert change_text(-4.58, -4.55, "commodity") == "-4.58 (-4.55%)"
+
+
+def test_eurusd_quotes_to_four_decimals():
+    assert level_text(_row(quote="fx", level=1.16043)) == "1.1604"
+    assert change_text(0.0046, 0.40, "fx") == "+0.40%"
+
+
+def test_usdjpy_quotes_to_two_decimals():
+    assert level_text(_row(quote="fxjpy", level=153.714)) == "153.71"
+    assert change_text(0.62, 0.40, "fxjpy") == "+0.40%"
+
+
+def test_vix_quotes_points_and_percent():
+    assert change_text(-2.27, -12.8, "points") == "-2.27 (-12.8%)"
+
+
+def test_a_yield_still_quotes_basis_points_only():
+    assert change_text(-0.07, None, "yield") == "-7bp"
+    assert change_text(-0.25, None, "bp") == "-25bp"
+
+
+def test_the_payload_carries_cross_check_results_and_the_page_shows_them():
+    from brief.crosscheck import CheckResult
+
+    payload = build_payload(
+        synthetic_levels(),
+        checks=[
+            CheckResult("spx", "S&P 500", 100.0, 100.0, 0.0, "2026-09-18", True),
+            CheckResult("crude", "WTI", 96.0, 107.0, 10.3, "2026-09-18", False,
+                        "differ by 10.30%"),
+        ],
+    )
+    html = render(payload)
+    assert "cross-check" in html.lower()
+    assert "WTI" in html
+    assert "10.30%" in html
+
+
+def test_a_page_with_every_cross_check_passing_says_so_briefly():
+    from brief.crosscheck import CheckResult
+
+    payload = build_payload(
+        synthetic_levels(),
+        checks=[CheckResult("spx", "S&P 500", 100.0, 100.0, 0.0, "2026-09-18", True)],
+    )
+    html = render(payload)
+    assert "cross-checks ok" in html.lower()

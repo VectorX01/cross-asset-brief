@@ -26,25 +26,52 @@ def format_value(value: float, unit: str) -> str:
     return UNIT_FORMATS.get(unit, lambda v: f"{v:+.2f}")(value)
 
 
+# How each quote convention is written. A table rather than a cascade of ifs
+# so adding an asset class is a row, and so the conventions sit together where
+# they can be compared against how a desk actually says them.
+LEVEL_FORMATS = {
+    "index": lambda v: f"{v:,.2f}",
+    "commodity": lambda v: f"{v:,.2f}",
+    "fx": lambda v: f"{v:,.4f}",
+    "fxjpy": lambda v: f"{v:,.2f}",
+    "bp": lambda v: f"{v * 100:,.0f}bp",
+    "points": lambda v: f"{v:,.2f}",
+    "yield": lambda v: f"{v:,.2f}",
+}
+
+# Absolute-and-percent where a desk says both; percent alone for FX, where the
+# absolute is pips and nobody quotes those in a macro conversation; basis
+# points alone for anything rate-like, where a percent is meaningless.
+CHANGE_FORMATS = {
+    "index": lambda a, p: f"{a:+,.2f} ({p:+.2f}%)",
+    "commodity": lambda a, p: f"{a:+,.2f} ({p:+.2f}%)",
+    "points": lambda a, p: f"{a:+,.2f} ({p:+.1f}%)",
+    "fx": lambda a, p: f"{p:+.2f}%",
+    "fxjpy": lambda a, p: f"{p:+.2f}%",
+    "bp": lambda a, p: f"{a * 100:+,.0f}bp",
+    "yield": lambda a, p: f"{a * 100:+,.0f}bp",
+}
+
+
 def level_text(row) -> str:
     """The number as a desk would write it."""
-    if row.quote == "price":
-        return f"{row.level:,.1f}"
-    if row.quote == "bp":
-        return f"{row.level * 100:,.0f}bp"
-    return f"{row.level:.2f}"
+    return LEVEL_FORMATS[row.quote](row.level)
 
 
-def change_text(value: float | None, quote: str) -> str:
+def change_text(absolute: float | None, percent: float | None, quote: str) -> str:
     """No move is an em dash: "only one observation" and "it did not move"
     are different facts and the board should not conflate them."""
-    if value is None:
+    if absolute is None:
         return "—"
-    if quote == "price":
-        return f"{value:+.1f}%"
-    if quote == "points":
-        return f"{value:+.2f}"
-    return f"{value * 100:+.0f}bp"
+    return CHANGE_FORMATS[quote](absolute, percent)
+
+
+def move_direction(absolute: float | None) -> str:
+    """Green up, red down -- direction, not judgment. A yield rising is green
+    whether or not that is good news for whoever is reading."""
+    if absolute is None or absolute == 0:
+        return "flat"
+    return "up" if absolute > 0 else "down"
 
 
 def range_text(row) -> str:
@@ -54,13 +81,10 @@ def range_text(row) -> str:
     minus sign against a dash and reads as a typo.
     """
     joiner = " to " if row.low_1y < 0 else "–"
-    if row.quote == "price":
-        return f"{row.low_1y:,.0f}{joiner}{row.high_1y:,.0f}"
     if row.quote == "bp":
         return f"{row.low_1y * 100:,.0f}{joiner}{row.high_1y * 100:,.0f}bp"
-    if row.quote == "points":
-        return f"{row.low_1y:.1f}{joiner}{row.high_1y:.1f}"
-    return f"{row.low_1y:.2f}{joiner}{row.high_1y:.2f}"
+    fmt = LEVEL_FORMATS[row.quote]
+    return f"{fmt(row.low_1y)}{joiner}{fmt(row.high_1y)}"
 
 
 def _environment() -> Environment:
@@ -77,6 +101,7 @@ def _environment() -> Environment:
     env.globals["level"] = level_text
     env.globals["change"] = change_text
     env.globals["span"] = range_text
+    env.globals["direction"] = move_direction
     return env
 
 

@@ -48,3 +48,16 @@ def test_prices_that_move_fast_are_not_sourced_from_fred():
 def test_rates_and_credit_stay_on_fred_which_is_official_and_complete():
     for key in ("ust2", "ust10", "ust30", "real10", "be10", "sofr", "hy", "ig"):
         assert SERIES[key].source == "FRED", key
+
+
+def test_only_one_crude_row_reaches_the_board():
+    """Front-month and spot Cushing differ by a real basis, but FRED's spot
+    also lags several days, so side by side they showed an 11% gap that was
+    mostly staleness. The board shows the fresh front-month; spot stays a
+    metric input and is reconciled by the cross-check instead."""
+    from brief.config import BOARD_SECTIONS, COMOVEMENT_BASKET
+
+    on_board = {key for _, keys in BOARD_SECTIONS for key in keys}
+    assert "crude" in on_board
+    assert "wti" not in on_board
+    assert "wti" in COMOVEMENT_BASKET

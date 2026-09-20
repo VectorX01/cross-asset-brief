@@ -6,7 +6,8 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from brief.config import BOARD_SECTIONS, BOARD_SPREADS, SERIES, source_of
+from brief.config import BOARD_SECTIONS, BOARD_SPREADS, CROSS_CHECKS, SERIES, source_of
+from brief.crosscheck import run_checks
 from brief.levels import build_board
 from brief.metrics.registry import REGISTRY
 from brief.sources.fred import fetch
@@ -161,7 +162,21 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
         return _unavailable(metric, str(exc))
 
 
-def build_payload(levels: dict[str, pd.Series], source_status: dict[str, str] | None = None) -> dict:
+def run_cross_checks(levels: dict[str, pd.Series]) -> list:
+    """Reconcile every declared pair. Does I/O, so it is not in build_payload."""
+    import brief.sources.yahoo as yahoo
+
+    def partner(source: str, series_id: str) -> pd.Series:
+        return yahoo.fetch(series_id) if source == 'YAHOO' else fetch(series_id)
+
+    return run_checks(levels, CROSS_CHECKS, partner)
+
+
+def build_payload(
+    levels: dict[str, pd.Series],
+    source_status: dict[str, str] | None = None,
+    checks: list | None = None,
+) -> dict:
     # Imported locally, not at module level: rank.py imports Tile from this
     # module, so a top-level import here would reintroduce that cycle.
     from brief.rank import rank_anomalies
@@ -181,5 +196,6 @@ def build_payload(levels: dict[str, pd.Series], source_status: dict[str, str] | 
         "unusual": rank_anomalies(tiles),
         "setup": setup,
         "board": build_board(levels, sections=BOARD_SECTIONS, spreads=BOARD_SPREADS),
+        "checks": checks or [],
         "source_status": source_status or {},
     }

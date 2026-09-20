@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from brief.metrics import cross_asset, positioning  # noqa: F401  (registers metrics)
-from brief.pipeline import build_payload, load_levels
+from brief.pipeline import build_payload, load_levels, run_cross_checks
 from brief.render.page import render
 
 DIST = Path("dist")
@@ -12,7 +12,7 @@ DIST = Path("dist")
 
 def main() -> int:
     levels, status = load_levels()
-    payload = build_payload(levels, source_status=status)
+    payload = build_payload(levels, source_status=status, checks=run_cross_checks(levels))
     DIST.mkdir(exist_ok=True)
     (DIST / "index.html").write_text(render(payload), encoding="utf-8")
     broken = [t.name for t in payload["tiles"] if t.error]
