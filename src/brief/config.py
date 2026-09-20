@@ -56,8 +56,8 @@ def source_of(key: str) -> str:
 
 @dataclass(frozen=True)
 class ContractDef:
-    report: str          # "tff" or "disagg"
-    market_code: str     # exact market_and_exchange_names value
+    report: str                  # "tff" or "disagg"
+    market_codes: tuple[str, ...]  # exact market_and_exchange_names values, oldest first
     label: str
     price_series: str | None   # key into SERIES, or None if no free daily price
 
@@ -67,22 +67,50 @@ class ContractDef:
 # and "spx" -> SP500 was added specifically to pair with this contract.
 # Pairing E-mini S&P positioning against a Nasdaq price would be wrong.
 #
-# wti's market_code is "WTI-PHYSICAL", not "CRUDE OIL, LIGHT SWEET": CFTC
-# renamed the flagship NYMEX WTI contract on 2022-02-08 (confirmed via the
-# live API — "CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE" has no
-# reports after 2022-02-01; "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE"
-# has the same ~2M-contract open interest starting the next report week and
-# continues to the present. It is the same contract under its current name.
+# CFTC renamed es, ust10, dxy and wti's market_and_exchange_names on
+# 2022-02-08 (confirmed via the live API): the old name's last report is
+# 2022-02-01 and the new name's first report is 2022-02-08, with matching
+# open interest across the boundary and no gap or overlap. Each pair is one
+# continuous series under two names, so market_codes lists both, oldest
+# first: 817 pre-rename reports (2006-06-13 -> 2022-02-01) + 241
+# post-rename reports (2022-02-08 -> 2026-09-15) = 1058, exactly matching
+# gold's report count, which was never renamed and needs only one name.
 CONTRACTS: dict[str, ContractDef] = {
     "es": ContractDef(
-        "tff", "E-MINI S&P 500 - CHICAGO MERCANTILE EXCHANGE", "E-mini S&P 500", "spx"
+        "tff",
+        (
+            "E-MINI S&P 500 STOCK INDEX - CHICAGO MERCANTILE EXCHANGE",
+            "E-MINI S&P 500 - CHICAGO MERCANTILE EXCHANGE",
+        ),
+        "E-mini S&P 500",
+        "spx",
     ),
     "ust10": ContractDef(
-        "tff", "UST 10Y NOTE - CHICAGO BOARD OF TRADE", "10y Treasury note", "ust10"
+        "tff",
+        (
+            "10-YEAR U.S. TREASURY NOTES - CHICAGO BOARD OF TRADE",
+            "UST 10Y NOTE - CHICAGO BOARD OF TRADE",
+        ),
+        "10y Treasury note",
+        "ust10",
     ),
-    "dxy": ContractDef("tff", "USD INDEX - ICE FUTURES U.S.", "US Dollar Index", "usd"),
-    "gold": ContractDef("disagg", "GOLD - COMMODITY EXCHANGE INC.", "Gold", None),
+    "dxy": ContractDef(
+        "tff",
+        (
+            "U.S. DOLLAR INDEX - ICE FUTURES U.S.",
+            "USD INDEX - ICE FUTURES U.S.",
+        ),
+        "US Dollar Index",
+        "usd",
+    ),
+    "gold": ContractDef("disagg", ("GOLD - COMMODITY EXCHANGE INC.",), "Gold", None),
     "wti": ContractDef(
-        "disagg", "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE", "WTI crude", "wti"
+        "disagg",
+        (
+            "CRUDE OIL, LIGHT SWEET - NEW YORK MERCANTILE EXCHANGE",
+            "WTI-PHYSICAL - NEW YORK MERCANTILE EXCHANGE",
+        ),
+        "WTI crude",
+        "wti",
     ),
 }

@@ -42,15 +42,45 @@ def parse_positions(rows: list[dict], report: str) -> pd.Series:
     return pd.Series(values, index=pd.DatetimeIndex(dates), name="net").sort_index()
 
 
-def fetch(contract_key: str) -> pd.Series:
-    contract = CONTRACTS[contract_key]
+def splice(series_list: list[pd.Series]) -> pd.Series:
+    """Concatenate same-contract series recorded under different market names.
+
+    The pieces must not share a date — CFTC's renames are documented as
+    non-overlapping, and a duplicate date silently double-counting a week
+    would otherwise be invisible in a percentile.
+    """
+    combined = pd.concat(series_list).sort_index()
+    duplicates = combined.index[combined.index.duplicated()]
+    if not duplicates.empty:
+        raise CftcError(f"overlapping report date(s) across market codes: {list(duplicates)}")
+    return combined
+
+
+def _fetch_one(dataset: str, market_code: str, report: str) -> pd.Series:
     params = {
         "$limit": LIMIT,
-        "$where": f"{MARKET_FIELD}='{contract.market_code}'",
+        "$where": f"{MARKET_FIELD}='{market_code}'",
         "$order": f"{DATE_FIELD} ASC",
     }
-    url = f"{BASE}/{DATASETS[contract.report]}.json"
+    url = f"{BASE}/{dataset}.json"
     response = requests.get(url, params=params, timeout=TIMEOUT)
     if response.status_code != 200:
-        raise CftcError(f"{contract_key}: HTTP {response.status_code} {response.text[:200]}")
-    return parse_positions(response.json(), contract.report)
+        raise CftcError(f"{market_code}: HTTP {response.status_code} {response.text[:200]}")
+    return parse_positions(response.json(), report)
+
+
+def fetch(contract_key: str) -> pd.Series:
+    """Fetch a contract's full history, splicing across any market-name renames.
+
+    Each market code is queried separately (rather than a SoQL `in(...)`
+    clause) because some names contain commas and ampersands that would
+    need careful quoting; per-name queries sidestep that at the cost of a
+    few extra HTTP calls.
+    """
+    contract = CONTRACTS[contract_key]
+    dataset = DATASETS[contract.report]
+    pieces = [
+        _fetch_one(dataset, market_code, contract.report)
+        for market_code in contract.market_codes
+    ]
+    return splice(pieces)

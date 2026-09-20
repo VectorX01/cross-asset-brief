@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from brief.sources.cftc import CftcError, parse_positions
+from brief.sources.cftc import CftcError, parse_positions, splice
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -44,3 +44,24 @@ def test_parse_rejects_an_unknown_report():
 def test_parse_rejects_empty_rows():
     with pytest.raises(CftcError, match="no rows"):
         parse_positions([], "tff")
+
+
+def test_splice_concatenates_disjoint_series_with_no_duplicates():
+    # The fixture is a single market ordered by report date DESC, so the
+    # first half is disjoint in date from the second half — the same shape
+    # as splicing a contract's pre- and post-rename market codes.
+    rows = json.loads((FIXTURES / "cftc_tff.json").read_text())
+    recent = parse_positions(rows[:10], "tff")
+    older = parse_positions(rows[10:], "tff")
+    combined = splice([older, recent])
+    assert len(combined) == len(rows)
+    assert combined.index.is_monotonic_increasing
+    assert not combined.index.has_duplicates
+
+
+def test_splice_rejects_overlapping_dates():
+    rows = json.loads((FIXTURES / "cftc_tff.json").read_text())
+    a = parse_positions(rows, "tff")
+    b = parse_positions(rows, "tff")  # same dates as `a` -> overlap
+    with pytest.raises(CftcError, match="overlapping"):
+        splice([a, b])
