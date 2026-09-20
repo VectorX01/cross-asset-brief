@@ -122,5 +122,8 @@ divergence = register(
         fn=_divergence,
         interpret=_interpret_divergence,
         unit="pctile pts",
+        # The spec gives this metric its own block rather than a grid
+        # position: it is the only tile that is implicitly a trade.
+        role="setup",
     )
 )

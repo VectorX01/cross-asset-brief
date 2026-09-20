@@ -22,6 +22,12 @@ class Metric:
     fn: Callable[[dict[str, pd.Series]], pd.Series]
     interpret: Interpreter
     unit: str
+    # What the layout should do with this metric, if anything special.
+    # "setup" gets its own block above the grid. Declared here so the
+    # pipeline can ask the registry what a metric is for instead of
+    # branching on its name -- renaming a metric must not silently change
+    # the page.
+    role: str | None = None
 
 
 REGISTRY: dict[str, Metric] = {}

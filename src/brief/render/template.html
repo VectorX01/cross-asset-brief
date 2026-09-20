@@ -103,7 +103,7 @@
     <section class="tile">
       <h3>{{ tile.title }}</h3>
       {% if tile.error %}
-        <p class="sentence">unavailable — {{ tile.error }}</p>
+        <p class="sentence">{{ tile.sentence }}</p>
         <p class="asof">{{ tile.sources | join(", ") }}</p>
       {% else %}
         <p class="value">{{ value(tile.value, tile.unit) }}</p>

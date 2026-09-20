@@ -1,9 +1,16 @@
 import numpy as np
 import pandas as pd
+import pytest
 
 from brief.metrics import cross_asset  # noqa: F401
 from brief.metrics.registry import REGISTRY, Metric
-from brief.pipeline import STALE_AFTER_DAYS, Tile, _staleness_gate, _tile_for, build_payload
+from brief.pipeline import (
+    CFTC_STALE_AFTER_DAYS,
+    Tile,
+    _staleness_gate,
+    _tile_for,
+    build_payload,
+)
 from brief.render.page import format_value, render
 from brief.render.svg import percentile_strip, sparkline
 
@@ -104,7 +111,9 @@ def test_a_tile_older_than_its_cadence_is_marked_stale():
     levels = synthetic_levels()  # ends in 2021, far past any cadence
     payload = build_payload(levels)
     assert tile_named(payload, "stock_bond").stale is True
-    assert "stale" in render(payload)
+    # "stale" alone cannot fail: it is a CSS class name in every page's
+    # <style> block. The marker on the tile is what matters.
+    assert 'class="asof stale"' in render(payload)
 
 
 def test_staleness_gate_for_default_tolerance_fred_inputs_is_five_days():
@@ -117,8 +126,8 @@ def test_staleness_gate_widens_for_a_slower_publishing_fred_input():
 
 
 def test_staleness_gate_widens_for_any_cftc_input():
-    assert _staleness_gate(_metric(("cot_es",))) == STALE_AFTER_DAYS["weekly"]
-    assert _staleness_gate(_metric(("cot_es", "spx"))) == STALE_AFTER_DAYS["weekly"]
+    assert _staleness_gate(_metric(("cot_es",))) == CFTC_STALE_AFTER_DAYS
+    assert _staleness_gate(_metric(("cot_es", "spx"))) == CFTC_STALE_AFTER_DAYS
 
 
 def test_a_genuinely_ancient_tile_is_still_marked_stale_even_with_a_wide_gate():
@@ -313,3 +322,36 @@ def test_the_setup_headline_is_formatted_by_unit_too():
         "source_status": {},
     }
     assert "+37 pctile pts" in render(payload)
+
+
+def test_the_setup_block_is_chosen_by_role_not_by_metric_name():
+    # Metric-identity branching in the pipeline was ruled out twice during
+    # this build: with `t.name == "divergence"`, renaming the metric would
+    # have made the Setup block silently vanish. The pipeline asks the
+    # registry what a metric is for and never knows which metric that is.
+    import brief.pipeline as pipeline
+
+    from brief.metrics.registry import Metric as M
+
+    renamed = M(
+        name="renamed_setup", title="Renamed", inputs=("equity",), context_window=None,
+        fn=lambda levels: levels["equity"], interpret=lambda value, pctile: "s",
+        unit="corr", role="setup",
+    )
+    ordinary = M(
+        name="ordinary", title="Ordinary", inputs=("equity",), context_window=None,
+        fn=lambda levels: levels["equity"], interpret=lambda value, pctile: "s",
+        unit="corr",
+    )
+    fake_registry = {"ordinary": ordinary, "renamed_setup": renamed}
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(pipeline, "REGISTRY", fake_registry)
+        payload = pipeline.build_payload(synthetic_levels())
+    assert payload["setup"].name == "renamed_setup"
+    assert ordinary.role is None
+
+
+def test_the_registered_divergence_metric_is_the_setup_metric():
+    from brief.metrics import positioning  # noqa: F401  (registers divergence)
+
+    assert REGISTRY["divergence"].role == "setup"

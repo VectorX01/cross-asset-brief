@@ -13,9 +13,10 @@ from brief.transforms import percentile_rank
 
 SPARK_POINTS = 120
 
-# How old a metric's newest observation may be before the tile is marked stale.
-# CoT is weekly and already three days old when published, so it gets a wide gate.
-STALE_AFTER_DAYS = {"daily": 5, "weekly": 12}
+# How old a CoT-backed tile's newest observation may be before it is marked
+# stale. CoT is weekly and already three days old when published, so it gets a
+# wide gate. FRED series carry their own tolerance on SeriesDef.
+CFTC_STALE_AFTER_DAYS = 12
 
 
 @dataclass
@@ -45,12 +46,12 @@ def load_levels() -> tuple[dict[str, pd.Series], dict[str, str]]:
         try:
             levels[key] = fetch(definition.fred_id)
         except Exception as exc:
-            status[f"fred:{definition.fred_id}"] = str(exc)[:120]
+            status[f"FRED {definition.label} ({definition.fred_id})"] = str(exc)[:120]
     for key in CONTRACTS:
         try:
             levels[f"cot_{key}"] = fetch_cot(key)
         except Exception as exc:
-            status[f"cftc:{key}"] = str(exc)[:120]
+            status[f"CFTC {CONTRACTS[key].label}"] = str(exc)[:120]
     return levels, status
 
 
@@ -68,7 +69,7 @@ def _staleness_gate(metric) -> int:
 
     def tolerance(name: str) -> int:
         if source_of(name) == "CFTC":
-            return STALE_AFTER_DAYS["weekly"]
+            return CFTC_STALE_AFTER_DAYS
         return SERIES[name].stale_after_days
 
     return max(tolerance(name) for name in metric.inputs)
@@ -151,8 +152,15 @@ def build_payload(levels: dict[str, pd.Series], source_status: dict[str, str] | 
     # module, so a top-level import here would reintroduce that cycle.
     from brief.rank import rank_anomalies
 
-    tiles = [_tile_for(metric, levels) for metric in REGISTRY.values()]
-    setup = next((t for t in tiles if t.name == "divergence" and t.error is None), None)
+    # The metric declares its own role; the pipeline never knows which metric
+    # it is looking at. Branching on t.name == "divergence" here meant a
+    # rename would have made the Setup block silently vanish.
+    tiles, setup = [], None
+    for metric in REGISTRY.values():
+        tile = _tile_for(metric, levels)
+        tiles.append(tile)
+        if metric.role == "setup" and tile.error is None:
+            setup = tile
     return {
         "date": str(date.today()),
         "tiles": tiles,

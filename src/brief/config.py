@@ -50,7 +50,6 @@ SERIES: dict[str, SeriesDef] = {
     "equity": SeriesDef("NASDAQCOM", "Nasdaq Composite", PRICE_LIKE),
     "spx": SeriesDef("SP500", "S&P 500", PRICE_LIKE),
     "ust10": SeriesDef("DGS10", "10y Treasury yield", RATE_LIKE),
-    "ust2": SeriesDef("DGS2", "2y Treasury yield", RATE_LIKE),
     "usd": SeriesDef("DTWEXBGS", "Broad dollar index", PRICE_LIKE, stale_after_days=12),  # observed ~9d publication lag
     "credit": SeriesDef("BAA10Y", "Baa corporate spread over 10y", RATE_LIKE),
     "vix": SeriesDef("VIXCLS", "VIX", RATE_LIKE),
