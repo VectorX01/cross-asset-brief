@@ -59,6 +59,27 @@
     <span class="meta">{{ payload.date }}</span>
   </header>
 
+  <h2>What's unusual today</h2>
+  {% if payload.unusual %}
+  <ol>
+    {% for tile in payload.unusual %}
+      <li>{{ tile.sentence }} <span class="pct">({{ "%.0f"|format(tile.pctile) }}th pct)</span></li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p class="sentence">No metric is available today.</p>
+  {% endif %}
+
+  {% if payload.setup %}
+  <h2>Setup</h2>
+  <section class="tile">
+    <p class="value">{{ "%+.0f"|format(payload.setup.value) }}</p>
+    {{ strip(payload.setup.pctile) }}
+    <p class="sentence">{{ payload.setup.sentence }}</p>
+    <p class="asof">as of {{ payload.setup.as_of }}</p>
+  </section>
+  {% endif %}
+
   <h2>Metrics</h2>
   <div class="grid">
   {% for tile in payload.tiles %}

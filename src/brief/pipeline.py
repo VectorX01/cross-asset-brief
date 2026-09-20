@@ -85,5 +85,13 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
 
 
 def build_payload(levels: dict[str, pd.Series]) -> dict:
+    from brief.rank import rank_anomalies
+
     tiles = [_tile_for(metric, levels) for metric in REGISTRY.values()]
-    return {"date": str(date.today()), "tiles": tiles}
+    setup = next((t for t in tiles if t.name == "divergence" and t.error is None), None)
+    return {
+        "date": str(date.today()),
+        "tiles": tiles,
+        "unusual": rank_anomalies(tiles),
+        "setup": setup,
+    }
