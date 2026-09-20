@@ -20,6 +20,11 @@ class SeriesDef:
     fred_id: str
     label: str
     kind: str
+    # How many days old this series' newest observation may be before a tile
+    # that depends on it is marked stale. A property of the series' own
+    # publication lag, not of any metric that consumes it. Defaulted field
+    # must come last on a frozen dataclass.
+    stale_after_days: int = 5
 
 
 # equity: WILL5000IND is gone from FRED entirely (confirmed 400 on both
@@ -40,10 +45,10 @@ SERIES: dict[str, SeriesDef] = {
     "spx": SeriesDef("SP500", "S&P 500", PRICE_LIKE),
     "ust10": SeriesDef("DGS10", "10y Treasury yield", RATE_LIKE),
     "ust2": SeriesDef("DGS2", "2y Treasury yield", RATE_LIKE),
-    "usd": SeriesDef("DTWEXBGS", "Broad dollar index", PRICE_LIKE),
+    "usd": SeriesDef("DTWEXBGS", "Broad dollar index", PRICE_LIKE, stale_after_days=12),  # observed ~9d publication lag
     "credit": SeriesDef("BAA10Y", "Baa corporate spread over 10y", RATE_LIKE),
     "vix": SeriesDef("VIXCLS", "VIX", RATE_LIKE),
-    "wti": SeriesDef("DCOILWTICO", "WTI crude", PRICE_LIKE),
+    "wti": SeriesDef("DCOILWTICO", "WTI crude", PRICE_LIKE, stale_after_days=8),  # observed ~5d publication lag
 }
 
 COMOVEMENT_BASKET = ("equity", "ust10", "usd", "credit", "wti", "vix")

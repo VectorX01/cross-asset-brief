@@ -3,9 +3,16 @@ import pandas as pd
 
 from brief.metrics import cross_asset  # noqa: F401
 from brief.metrics.registry import REGISTRY, Metric
-from brief.pipeline import Tile, _tile_for, build_payload
+from brief.pipeline import STALE_AFTER_DAYS, Tile, _staleness_gate, _tile_for, build_payload
 from brief.render.page import render
 from brief.render.svg import percentile_strip, sparkline
+
+
+def _metric(inputs):
+    return Metric(
+        name="probe", title="Probe", inputs=inputs, context_window=None,
+        fn=lambda levels: None, interpret=lambda value, pctile: "", unit="",
+    )
 
 
 def tile_named(payload, name):
@@ -98,6 +105,39 @@ def test_a_tile_older_than_its_cadence_is_marked_stale():
     payload = build_payload(levels)
     assert tile_named(payload, "stock_bond").stale is True
     assert "stale" in render(payload)
+
+
+def test_staleness_gate_for_default_tolerance_fred_inputs_is_five_days():
+    assert _staleness_gate(_metric(("equity", "ust10"))) == 5
+
+
+def test_staleness_gate_widens_for_a_slower_publishing_fred_input():
+    # "usd" -> DTWEXBGS, pinned to a 12-day tolerance for its observed lag.
+    assert _staleness_gate(_metric(("equity", "usd"))) == 12
+
+
+def test_staleness_gate_widens_for_any_cftc_input():
+    assert _staleness_gate(_metric(("cot_es",))) == STALE_AFTER_DAYS["weekly"]
+    assert _staleness_gate(_metric(("cot_es", "spx"))) == STALE_AFTER_DAYS["weekly"]
+
+
+def test_a_genuinely_ancient_tile_is_still_marked_stale_even_with_a_wide_gate():
+    # Widening individual gates must not disable the feature outright: a
+    # metric whose only input is the slowest FRED series (usd, 12-day gate)
+    # is still marked stale once its data is far older than even that.
+    old_levels = synthetic_levels()  # ends in 2021
+    old_levels["usd"] = old_levels["equity"].rename("usd")
+    metric = _metric(("usd",))
+    assert _staleness_gate(metric) == 12
+    tile = _tile_for(
+        Metric(
+            name="usd_only", title="USD only", inputs=("usd",), context_window=None,
+            fn=lambda levels: levels["usd"],
+            interpret=lambda value, pctile: "n/a", unit="",
+        ),
+        old_levels,
+    )
+    assert tile.stale is True
 
 
 def test_source_failures_appear_in_the_header():

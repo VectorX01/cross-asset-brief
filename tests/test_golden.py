@@ -25,9 +25,14 @@ def frozen_levels():
     idx = pd.bdate_range("2018-01-01", periods=1500)
     rng = np.random.default_rng(42)
     shock = rng.normal(size=1500)
+    independent = rng.normal(size=1500)
+    # ust10 blends the shared shock with an independent draw so stock_bond
+    # lands mid-range rather than saturating at the +-1.0 clamp boundary
+    # (R19): a value pinned exactly at the boundary can't distinguish the
+    # real metric from a regression that dropped differencing entirely.
     return {
         "equity": pd.Series(100 * np.exp(np.cumsum(shock * 0.01)), index=idx),
-        "ust10": pd.Series(4.0 + np.cumsum(shock * 0.02), index=idx),
+        "ust10": pd.Series(4.0 + np.cumsum((shock * 0.6 + independent * 0.8) * 0.02), index=idx),
         "credit": pd.Series(4.0 + np.cumsum(rng.normal(size=1500) * 0.01), index=idx),
         "vix": pd.Series(18.0 + np.cumsum(rng.normal(size=1500) * 0.05), index=idx),
     }

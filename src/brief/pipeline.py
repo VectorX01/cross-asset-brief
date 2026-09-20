@@ -57,9 +57,19 @@ def _sources_for(metric) -> tuple[str, ...]:
 
 
 def _staleness_gate(metric) -> int:
-    """CoT publishes weekly, on a Friday, for the prior Tuesday — so a CFTC-backed
-    tile is legitimately older than a FRED-backed one before it counts as stale."""
-    return STALE_AFTER_DAYS["weekly"] if "CFTC" in _sources_for(metric) else STALE_AFTER_DAYS["daily"]
+    """The gate is the loosest tolerance among a metric's own inputs: a metric
+    is only as fresh as its slowest-publishing input. CoT is weekly and
+    already three days old when published, so any CFTC input gets the wide
+    weekly gate; a FRED input carries its own series-specific tolerance
+    (SeriesDef.stale_after_days), since publication lag is a property of the
+    series, not of the metric that happens to consume it."""
+
+    def tolerance(name: str) -> int:
+        if source_of(name) == "CFTC":
+            return STALE_AFTER_DAYS["weekly"]
+        return SERIES[name].stale_after_days
+
+    return max(tolerance(name) for name in metric.inputs)
 
 
 def _unavailable(metric, reason: str) -> Tile:
