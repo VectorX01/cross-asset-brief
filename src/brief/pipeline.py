@@ -84,6 +84,9 @@ def _context_label(series: pd.Series, window: int | None) -> str:
     cannot tell them apart. A window wider than the history available reports
     the history that is actually there.
     """
+    # dropna first, exactly as percentile_rank does, so the window stated
+    # here is the window the percentile was actually taken over.
+    series = series.dropna()
     if window is None or window >= len(series):
         return f"since {series.index[0].year}"
     span = series.index[-1] - series.index[-window]
