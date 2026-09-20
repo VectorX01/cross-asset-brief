@@ -43,3 +43,12 @@ SERIES: dict[str, SeriesDef] = {
 }
 
 COMOVEMENT_BASKET = ("equity", "ust10", "usd", "credit", "wti", "vix")
+
+
+def source_of(key: str) -> str:
+    """Which public API a levels key came from."""
+    if key.startswith("cot_"):
+        return "CFTC"
+    if key in SERIES:
+        return "FRED"
+    raise KeyError(f"unknown levels key: {key}")

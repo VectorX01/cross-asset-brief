@@ -5,7 +5,7 @@ from datetime import date
 
 import pandas as pd
 
-from brief.config import SERIES
+from brief.config import SERIES, source_of
 from brief.metrics.registry import REGISTRY
 from brief.sources.fred import fetch
 from brief.transforms import percentile_rank
@@ -23,6 +23,7 @@ class Tile:
     history: list[float]
     as_of: str
     unit: str
+    sources: tuple[str, ...]
     error: str | None = None
     stale: bool = False
 
@@ -32,34 +33,34 @@ def load_levels() -> dict[str, pd.Series]:
     return {key: fetch(definition.fred_id) for key, definition in SERIES.items()}
 
 
+def _sources_for(metric) -> tuple[str, ...]:
+    return tuple(sorted({source_of(name) for name in metric.inputs}))
+
+
+def _unavailable(metric, reason: str) -> Tile:
+    """A tile that says why it has no number, rather than rendering blank."""
+    return Tile(
+        name=metric.name,
+        title=metric.title,
+        value=None,
+        pctile=None,
+        sentence=f"unavailable — {reason}",
+        history=[],
+        as_of="",
+        unit=metric.unit,
+        sources=_sources_for(metric),
+        error=reason,
+    )
+
+
 def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
     missing = [name for name in metric.inputs if name not in levels]
     if missing:
-        return Tile(
-            name=metric.name,
-            title=metric.title,
-            value=None,
-            pctile=None,
-            sentence=f"unavailable — missing input {', '.join(missing)}",
-            history=[],
-            as_of="",
-            unit=metric.unit,
-            error=f"missing input {', '.join(missing)}",
-        )
+        return _unavailable(metric, f"missing input {', '.join(missing)}")
     try:
         series = metric.fn({name: levels[name] for name in metric.inputs})
     except Exception as exc:  # a broken metric must not take the page down
-        return Tile(
-            name=metric.name,
-            title=metric.title,
-            value=None,
-            pctile=None,
-            sentence=f"unavailable — {exc}",
-            history=[],
-            as_of="",
-            unit=metric.unit,
-            error=str(exc),
-        )
+        return _unavailable(metric, str(exc))
     value = float(series.iloc[-1])
     pctile = percentile_rank(series, window=metric.context_window)
     return Tile(
@@ -71,6 +72,7 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
         history=[float(v) for v in series.iloc[-SPARK_POINTS:]],
         as_of=str(series.index[-1].date()),
         unit=metric.unit,
+        sources=_sources_for(metric),
     )
 
 

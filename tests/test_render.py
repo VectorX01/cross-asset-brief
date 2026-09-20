@@ -1,10 +1,9 @@
 import numpy as np
 import pandas as pd
-import pytest
 
 from brief.metrics import cross_asset  # noqa: F401
-from brief.metrics.registry import REGISTRY
-from brief.pipeline import build_payload
+from brief.metrics.registry import REGISTRY, Metric
+from brief.pipeline import _tile_for, build_payload
 from brief.render.page import render
 from brief.render.svg import percentile_strip, sparkline
 
@@ -71,3 +70,24 @@ def test_render_shows_the_unavailable_reason_rather_than_a_blank():
     payload = build_payload({"equity": synthetic_levels()["equity"]})
     html = render(payload)
     assert "unavailable" in html
+
+
+def test_tile_for_catches_a_metric_that_raises_mid_computation():
+    def boom(levels):
+        raise ValueError("metric exploded")
+
+    metric = Metric(
+        name="boom", title="Boom", inputs=("equity",), context_window=None,
+        fn=boom, interpret=lambda value, pctile: "never reached", unit="",
+    )
+    tile = _tile_for(metric, synthetic_levels())
+    assert tile.value is None
+    assert "metric exploded" in tile.error
+
+
+def test_payload_tile_reports_its_source():
+    payload = build_payload(synthetic_levels())
+    tile = tile_named(payload, "stock_bond")
+    assert tile.sources == ("FRED",)
+    html = render(payload)
+    assert "FRED" in html
