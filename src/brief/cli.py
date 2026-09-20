@@ -11,13 +11,16 @@ DIST = Path("dist")
 
 
 def main() -> int:
-    payload = build_payload(load_levels())
+    levels, status = load_levels()
+    payload = build_payload(levels, source_status=status)
     DIST.mkdir(exist_ok=True)
     (DIST / "index.html").write_text(render(payload), encoding="utf-8")
     broken = [t.name for t in payload["tiles"] if t.error]
     print(f"built dist/index.html — {len(payload['tiles'])} tiles, {len(broken)} unavailable")
     if broken:
         print(f"unavailable: {', '.join(broken)}", file=sys.stderr)
+    for source, message in status.items():
+        print(f"source failed: {source}: {message}", file=sys.stderr)
     return 0
 
 

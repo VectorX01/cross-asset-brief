@@ -56,7 +56,14 @@
 <main>
   <header>
     <h1>Cross-asset brief</h1>
-    <span class="meta">{{ payload.date }}</span>
+    <span class="meta">
+      {{ payload.date }}
+      {% if payload.source_status %}
+        · {% for source, message in payload.source_status.items() %}{{ source }} failed ({{ message }}){% if not loop.last %}, {% endif %}{% endfor %}
+      {% else %}
+        · sources ok
+      {% endif %}
+    </span>
   </header>
 
   <h2>What's unusual today</h2>

@@ -3,7 +3,7 @@ import pandas as pd
 
 from brief.metrics import cross_asset  # noqa: F401
 from brief.metrics.registry import REGISTRY, Metric
-from brief.pipeline import _tile_for, build_payload
+from brief.pipeline import Tile, _tile_for, build_payload
 from brief.render.page import render
 from brief.render.svg import percentile_strip, sparkline
 
@@ -91,3 +91,37 @@ def test_payload_tile_reports_its_source():
     assert tile.sources == ("FRED",)
     html = render(payload)
     assert "FRED" in html
+
+
+def test_a_tile_older_than_its_cadence_is_marked_stale():
+    levels = synthetic_levels()  # ends in 2021, far past any cadence
+    payload = build_payload(levels)
+    assert tile_named(payload, "stock_bond").stale is True
+    assert "stale" in render(payload)
+
+
+def test_source_failures_appear_in_the_header():
+    payload = build_payload(synthetic_levels(), source_status={"cftc": "HTTP 503"})
+    html = render(payload)
+    assert "cftc" in html
+    assert "503" in html
+
+
+def test_unusual_and_setup_sections_render_with_a_correctly_suffixed_ordinal():
+    tile = Tile(
+        name="stock_bond", title="Stock/bond", value=0.5, pctile=72.0,
+        sentence="an unusual reading", history=[1.0, 2.0], as_of="2021-01-01",
+        unit="", sources=("FRED",),
+    )
+    payload = {
+        "date": "2021-01-01",
+        "tiles": [tile],
+        "unusual": [tile],
+        "setup": tile,
+        "source_status": {},
+    }
+    html = render(payload)
+    assert "What's unusual today" in html
+    assert "Setup" in html
+    assert "72nd" in html
+    assert "72th" not in html
