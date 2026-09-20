@@ -21,6 +21,13 @@ TRADING_DAYS_PER_YEAR = 252
 NOTABLE_PCTILE = 90.0
 
 
+# How a number is written on the board. Deliberately separate from `kind`,
+# which decides the differencing rule: VIX is rate-like for the maths (first
+# differences) but is quoted in vol points, and nobody writes 2s10s as 0.27.
+QUOTES = frozenset({"price", "yield", "bp", "points"})
+QUOTE_FOR_KIND = {PRICE_LIKE: "price", RATE_LIKE: "yield"}
+
+
 @dataclass(frozen=True)
 class SeriesDef:
     fred_id: str
@@ -31,6 +38,16 @@ class SeriesDef:
     # publication lag, not of any metric that consumes it. Defaulted field
     # must come last on a frozen dataclass.
     stale_after_days: int = 5
+    quote: str | None = None
+
+    def __post_init__(self):
+        if self.quote is None:
+            object.__setattr__(self, "quote", QUOTE_FOR_KIND[self.kind])
+        elif self.quote not in QUOTES:
+            # Unknown quotes would fall through the formatters' default and
+            # render as a yield -- silently, which is how a 2.27-point VIX
+            # move once printed as -227bp.
+            raise ValueError(f"{self.fred_id}: unknown quote {self.quote!r}")
 
 
 # equity: WILL5000IND is gone from FRED entirely (confirmed 400 on both
@@ -49,14 +66,48 @@ class SeriesDef:
 SERIES: dict[str, SeriesDef] = {
     "equity": SeriesDef("NASDAQCOM", "Nasdaq Composite", PRICE_LIKE),
     "spx": SeriesDef("SP500", "S&P 500", PRICE_LIKE),
-    "ust10": SeriesDef("DGS10", "10y Treasury yield", RATE_LIKE),
+    # The Treasury curve. Short labels because the board prints eleven of them
+    # in a row; the source-failure header prints the FRED id alongside, so
+    # "FRED 10y (DGS10)" stays unambiguous.
+    "ust1mo": SeriesDef("DGS1MO", "1m", RATE_LIKE),
+    "ust3mo": SeriesDef("DGS3MO", "3m", RATE_LIKE),
+    "ust6mo": SeriesDef("DGS6MO", "6m", RATE_LIKE),
+    "ust1": SeriesDef("DGS1", "1y", RATE_LIKE),
+    "ust2": SeriesDef("DGS2", "2y", RATE_LIKE),
+    "ust3": SeriesDef("DGS3", "3y", RATE_LIKE),
+    "ust5": SeriesDef("DGS5", "5y", RATE_LIKE),
+    "ust7": SeriesDef("DGS7", "7y", RATE_LIKE),
+    "ust10": SeriesDef("DGS10", "10y", RATE_LIKE),
+    "ust20": SeriesDef("DGS20", "20y", RATE_LIKE),
+    "ust30": SeriesDef("DGS30", "30y", RATE_LIKE),
     "usd": SeriesDef("DTWEXBGS", "Broad dollar index", PRICE_LIKE, stale_after_days=12),  # observed ~9d publication lag
-    "credit": SeriesDef("BAA10Y", "Baa corporate spread over 10y", RATE_LIKE),
-    "vix": SeriesDef("VIXCLS", "VIX", RATE_LIKE),
+    "credit": SeriesDef("BAA10Y", "Baa spread over 10y", RATE_LIKE, quote="bp"),
+    "vix": SeriesDef("VIXCLS", "VIX", RATE_LIKE, quote="points"),
     "wti": SeriesDef("DCOILWTICO", "WTI crude", PRICE_LIKE, stale_after_days=8),  # observed ~5d publication lag
 }
 
 COMOVEMENT_BASKET = ("equity", "ust10", "usd", "credit", "wti", "vix")
+
+# The levels board: reference, not analysis. Sections render in this order,
+# and a key that failed to load is simply absent rather than blank.
+BOARD_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Equities", ("equity", "spx")),
+    (
+        "Treasury curve",
+        (
+            "ust1mo", "ust3mo", "ust6mo", "ust1", "ust2", "ust3",
+            "ust5", "ust7", "ust10", "ust20", "ust30",
+        ),
+    ),
+    ("Other", ("usd", "credit", "vix", "wti")),
+)
+
+# (display label, section, short leg, long leg). The spread is long minus short,
+# which is how these are quoted: 2s10s positive means the curve is upward sloping.
+BOARD_SPREADS: tuple[tuple[str, str, str, str], ...] = (
+    ("2s10s", "Treasury curve", "ust2", "ust10"),
+    ("3m10y", "Treasury curve", "ust3mo", "ust10"),
+)
 
 
 def source_of(key: str) -> str:

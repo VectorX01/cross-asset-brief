@@ -6,7 +6,8 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from brief.config import SERIES, source_of
+from brief.config import BOARD_SECTIONS, BOARD_SPREADS, SERIES, source_of
+from brief.levels import build_board
 from brief.metrics.registry import REGISTRY
 from brief.sources.fred import fetch
 from brief.transforms import percentile_rank
@@ -30,6 +31,8 @@ class Tile:
     as_of: str
     unit: str
     context: str
+    why: str
+    implication: str
     sources: tuple[str, ...]
     error: str | None = None
     stale: bool = False
@@ -107,6 +110,8 @@ def _unavailable(metric, reason: str) -> Tile:
         history=[],
         as_of="",
         unit=metric.unit,
+        why=metric.why,
+        implication=metric.implication,
         context="",
         sources=_sources_for(metric),
         error=reason,
@@ -142,6 +147,8 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
             history=[float(v) for v in series.iloc[-SPARK_POINTS:]],
             as_of=str(last),
             unit=metric.unit,
+        why=metric.why,
+        implication=metric.implication,
             context=_context_label(series, metric.context_window),
             sources=_sources_for(metric),
             stale=stale,
@@ -169,5 +176,6 @@ def build_payload(levels: dict[str, pd.Series], source_status: dict[str, str] | 
         "tiles": tiles,
         "unusual": rank_anomalies(tiles),
         "setup": setup,
+        "board": build_board(levels, sections=BOARD_SECTIONS, spreads=BOARD_SPREADS),
         "source_status": source_status or {},
     }

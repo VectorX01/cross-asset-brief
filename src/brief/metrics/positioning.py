@@ -55,6 +55,16 @@ for _key, _contract in CONTRACTS.items():
             interpret=_interpret_positioning(
                 _contract.label, _contract.trader_category
             ),
+            why=(
+                f"How large speculative {_contract.trader_category} positioning is "
+                f"in {_contract.label} futures, against the last three years of its "
+                "own history. Published weekly by the CFTC, as of the prior Tuesday."
+            ),
+            implication=(
+                "A crowded position is fuel rather than a signal on its own — it "
+                "says who would be forced to sell if the move went against them. "
+                "Extremes matter most when price stops confirming the position."
+            ),
             unit="contracts",
         )
     )
@@ -127,6 +137,17 @@ divergence = register(
         fn=_divergence,
         interpret=_interpret_divergence,
         unit="pctile pts",
+        why=(
+            f"Where {CONTRACTS[DIVERGENCE_CONTRACT].trader_category} positioning in "
+            f"{CONTRACTS[DIVERGENCE_CONTRACT].label} futures sits in its three-year "
+            "range, minus where the index price sits in its three-month range."
+        ),
+        implication=(
+            "Positive means funds are long into weak price — a rally without "
+            "sponsorship, vulnerable to liquidation if it breaks. Negative means "
+            "short into strong price, which is how squeezes start. Near zero means "
+            "positioning and price agree and there is no tension to trade."
+        ),
         # The spec gives this metric its own block rather than a grid
         # position: it is the only tile that is implicitly a trade.
         role="setup",

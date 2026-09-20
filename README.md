@@ -7,6 +7,25 @@ static HTML page with no backend and no client-side JavaScript.
 
 ![Screenshot of the rendered brief](docs/img/screenshot.png)
 
+## The levels board
+
+Above the analysis sits a reference board: equities, the full Treasury curve
+(1m through 30y plus 2s10s and 3m10y), the dollar, credit, volatility and
+crude. Each carries its level, its 1-day and 1-month move, and its trailing
+one-year range.
+
+The range column is the one that earns its place. A level on its own says
+nothing about whether it is high or low, and the point of seeing these daily is
+to learn their scale rather than to monitor them.
+
+Two display conventions are kept separate on purpose. `kind` decides the
+differencing rule used by the metrics — price-like series become log returns,
+rate-like series become first differences. `quote` decides only how a number is
+written. They are not the same question: VIX is rate-like for the maths but is
+quoted in vol points, and the first build of this board rendered a 2.27-point
+VIX move as "-227bp". Curve spreads and credit are quoted in basis points, not
+as decimals.
+
 ## Why these metrics
 
 Every tile has to earn its place by showing something a consumer finance app
@@ -63,6 +82,11 @@ unremarkable, and equally it never makes a tail-strength claim like
 "diversification is not working today" off a 75th-percentile reading. The
 percentile carries the judgment; the prose only ever states what happened.
 
+Every tile carries a collapsed "why this is here" disclosure holding two
+sentences: what the metric measures, and what a reader should conclude from it.
+`why` and `implication` are required fields on `Metric`, alongside `interpret` —
+a metric nobody can justify in two sentences cannot be registered.
+
 ## Why explainable over sophisticated
 
 No metric in this system has a fitted parameter. Correlations, percentile
@@ -84,6 +108,14 @@ from the 50th percentile is comparable across tiles in a way `|z|` would
 not be.
 
 ## Staleness and failure handling
+
+The board applies the same rule as the tiles, per series. A row whose newest
+observation is older than that series' own observed publication lag prints its
+date and is marked stale; a row within its lag prints nothing. The broad dollar
+index genuinely publishes about nine days in arrears, so a uniform gate would
+have marked it stale permanently — and a warning that is always lit is one the
+reader stops seeing.
+
 
 A source that fails degrades the page rather than blanking it: `load_levels`
 catches per-series fetch errors and the affected tiles render

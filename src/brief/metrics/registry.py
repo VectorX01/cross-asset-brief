@@ -22,6 +22,12 @@ class Metric:
     fn: Callable[[dict[str, pd.Series]], pd.Series]
     interpret: Interpreter
     unit: str
+    # Why this metric is on the page at all, and what a reader should take
+    # from it. Required for the same reason `interpret` is: a metric nobody
+    # can justify in two sentences does not belong on a page whose purpose is
+    # teaching the reader what they are looking at.
+    why: str
+    implication: str
     # What the layout should do with this metric, if anything special.
     # "setup" gets its own block above the grid. Declared here so the
     # pipeline can ask the registry what a metric is for instead of

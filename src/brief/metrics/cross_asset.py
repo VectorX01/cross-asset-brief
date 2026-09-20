@@ -50,6 +50,16 @@ stock_bond_regime = register(
         fn=_stock_bond,
         interpret=_interpret_stock_bond,
         unit="corr",
+        why=(
+            "Whether equities and long-term yields have been moving together or "
+            "in opposite directions over the last 60 trading days."
+        ),
+        implication=(
+            "Negative means bonds are hedging equities: a selloff in stocks is "
+            "cushioned by a rally in Treasuries. Positive means the two fall "
+            "together, which is what happens when inflation or policy is the "
+            "driver — and it is the regime in which a 60/40 portfolio stops working."
+        ),
     )
 )
 
@@ -113,6 +123,17 @@ credit_vs_vol = register(
         fn=_credit_vs_vol,
         interpret=_interpret_credit_vs_vol,
         unit="pctile pts",
+        why=(
+            "Where credit spreads sit in their own five-year range, minus where "
+            "equity volatility sits in its. Both are stress gauges; this is the "
+            "gap between what they are saying."
+        ),
+        implication=(
+            "A large positive reading means credit is pricing more stress than the "
+            "equity market is. The two usually agree, so a wide gap means one is "
+            "early and the other complacent — the useful question is which, "
+            "because the gap closes one way or the other."
+        ),
     )
 )
 
@@ -125,5 +146,16 @@ comovement = register(
         fn=_comovement,
         interpret=_interpret_comovement,
         unit="corr",
+        why=(
+            "The average strength of the relationship between every pair in the "
+            "basket — equities, 10y yields, the dollar, credit, crude and "
+            "volatility — over 60 days, ignoring direction."
+        ),
+        implication=(
+            "High means one macro factor is driving everything at once, so "
+            "diversification is not working and sizing matters more than "
+            "selection. Low means assets are responding to their own stories, "
+            "which is the environment relative-value needs."
+        ),
     )
 )
