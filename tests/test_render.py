@@ -101,7 +101,9 @@ def test_tile_for_catches_a_metric_that_raises_mid_computation():
 def test_payload_tile_reports_its_source():
     payload = build_payload(synthetic_levels())
     tile = tile_named(payload, "stock_bond")
-    assert tile.sources == ("FRED",)
+    # stock_bond now draws Nasdaq from Yahoo and the 10y from FRED, so the
+    # tile must disclose both rather than implying a single provenance.
+    assert tile.sources == ("FRED", "YAHOO")
     html = render(payload)
     assert "FRED" in html
 
@@ -496,7 +498,7 @@ def test_the_live_board_quotes_vix_in_points_and_the_curve_spread_in_basis_point
     assert SERIES["vix"].quote == "points"
     assert SERIES["credit"].quote == "bp"
     assert SERIES["ust10"].quote == "yield"
-    assert SERIES["equity"].quote == "price"
+    assert SERIES["equity"].quote == "index"
 
 
 def test_a_range_whose_low_is_negative_reads_as_to_rather_than_a_dash():
@@ -537,3 +539,31 @@ def test_a_fresh_board_row_carries_no_date_and_no_marker():
     payload["board"] = [BoardSection(title="Other", rows=(_row(stale=False),))]
     html = render(payload)
     assert 'class="board-stale"' not in html
+
+
+def test_load_levels_fetches_each_series_from_its_declared_source(monkeypatch):
+    """A Yahoo symbol sent to FRED would 400 and land in source_status as a
+    failure, silently emptying the board of every fast-moving price."""
+    import brief.pipeline as pipeline
+
+    asked = {"FRED": [], "YAHOO": []}
+    stub = pd.Series([1.0, 2.0], index=pd.bdate_range("2026-01-01", periods=2))
+
+    def fake_fred(series_id, api_key=None):
+        asked["FRED"].append(series_id)
+        return stub
+
+    def fake_yahoo(symbol):
+        asked["YAHOO"].append(symbol)
+        return stub
+
+    monkeypatch.setattr(pipeline, "fetch", fake_fred)
+    monkeypatch.setattr("brief.sources.yahoo.fetch", fake_yahoo)
+    monkeypatch.setattr("brief.sources.cftc.fetch", lambda key: stub)
+
+    levels, status = pipeline.load_levels()
+
+    assert "^GSPC" in asked["YAHOO"] and "GC=F" in asked["YAHOO"]
+    assert "DGS10" in asked["FRED"] and "SOFR" in asked["FRED"]
+    assert "^GSPC" not in asked["FRED"]
+    assert status == {}

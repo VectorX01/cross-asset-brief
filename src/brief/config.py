@@ -24,13 +24,14 @@ NOTABLE_PCTILE = 90.0
 # How a number is written on the board. Deliberately separate from `kind`,
 # which decides the differencing rule: VIX is rate-like for the maths (first
 # differences) but is quoted in vol points, and nobody writes 2s10s as 0.27.
-QUOTES = frozenset({"price", "yield", "bp", "points"})
-QUOTE_FOR_KIND = {PRICE_LIKE: "price", RATE_LIKE: "yield"}
+SOURCES = frozenset({"FRED", "YAHOO", "ECB"})
+QUOTES = frozenset({"index", "fx", "fxjpy", "commodity", "yield", "bp", "points"})
+QUOTE_FOR_KIND = {PRICE_LIKE: "index", RATE_LIKE: "yield"}
 
 
 @dataclass(frozen=True)
 class SeriesDef:
-    fred_id: str
+    series_id: str
     label: str
     kind: str
     # How many days old this series' newest observation may be before a tile
@@ -39,6 +40,10 @@ class SeriesDef:
     # must come last on a frozen dataclass.
     stale_after_days: int = 5
     quote: str | None = None
+    source: str = "FRED"
+    # A series elsewhere that should track this one. Compared on every
+    # build, because an unofficial source is only defensible if checked.
+    cross_check: str | None = None
 
     def __post_init__(self):
         if self.quote is None:
@@ -47,7 +52,9 @@ class SeriesDef:
             # Unknown quotes would fall through the formatters' default and
             # render as a yield -- silently, which is how a 2.27-point VIX
             # move once printed as -227bp.
-            raise ValueError(f"{self.fred_id}: unknown quote {self.quote!r}")
+            raise ValueError(f"{self.series_id}: unknown quote {self.quote!r}")
+        if self.source not in SOURCES:
+            raise ValueError(f"{self.series_id}: unknown source {self.source!r}")
 
 
 # equity: WILL5000IND is gone from FRED entirely (confirmed 400 on both
@@ -64,11 +71,17 @@ class SeriesDef:
 # history and supports STRESS_WINDOW_YEARS = 5. No metric consumes "ig",
 # so it is dropped rather than replaced.
 SERIES: dict[str, SeriesDef] = {
-    "equity": SeriesDef("NASDAQCOM", "Nasdaq Composite", PRICE_LIKE),
-    "spx": SeriesDef("SP500", "S&P 500", PRICE_LIKE),
-    # The Treasury curve. Short labels because the board prints eleven of them
-    # in a row; the source-failure header prints the FRED id alongside, so
-    # "FRED 10y (DGS10)" stays unambiguous.
+    # Equities. Yahoo rather than FRED: FRED's index series run ~3 days behind,
+    # and an index close is an index close — the adjustment-methodology worry
+    # that dogs Yahoo applies to individual stocks, not to index levels.
+    "equity": SeriesDef("^IXIC", "Nasdaq Composite", PRICE_LIKE, quote="index",
+                        source="YAHOO", cross_check="NASDAQCOM"),
+    "spx": SeriesDef("^GSPC", "S&P 500", PRICE_LIKE, quote="index",
+                     source="YAHOO", cross_check="SP500"),
+
+    # The Treasury curve. FRED: official, and Yahoo carries only three tenors.
+    # Short labels because the board prints eleven in a row; the source-failure
+    # header prints the id alongside, so "FRED 10y (DGS10)" stays unambiguous.
     "ust1mo": SeriesDef("DGS1MO", "1m", RATE_LIKE),
     "ust3mo": SeriesDef("DGS3MO", "3m", RATE_LIKE),
     "ust6mo": SeriesDef("DGS6MO", "6m", RATE_LIKE),
@@ -77,13 +90,43 @@ SERIES: dict[str, SeriesDef] = {
     "ust3": SeriesDef("DGS3", "3y", RATE_LIKE),
     "ust5": SeriesDef("DGS5", "5y", RATE_LIKE),
     "ust7": SeriesDef("DGS7", "7y", RATE_LIKE),
-    "ust10": SeriesDef("DGS10", "10y", RATE_LIKE),
+    "ust10": SeriesDef("DGS10", "10y", RATE_LIKE, cross_check="^TNX"),
     "ust20": SeriesDef("DGS20", "20y", RATE_LIKE),
     "ust30": SeriesDef("DGS30", "30y", RATE_LIKE),
-    "usd": SeriesDef("DTWEXBGS", "Broad dollar index", PRICE_LIKE, stale_after_days=12),  # observed ~9d publication lag
-    "credit": SeriesDef("BAA10Y", "Baa spread over 10y", RATE_LIKE, quote="bp"),
+
+    # 10y nominal decomposes exactly: real + breakeven. Answers "growth scare
+    # or inflation scare?", which have opposite implications for equities.
+    "real10": SeriesDef("DFII10", "10y real", RATE_LIKE),
+    "be10": SeriesDef("T10YIE", "10y breakeven", RATE_LIKE),
+
+    # Funding. Where stress shows before it reaches price.
+    "sofr": SeriesDef("SOFR", "SOFR", RATE_LIKE),
+    "effr": SeriesDef("EFFR", "EFFR", RATE_LIKE),
+    "iorb": SeriesDef("IORB", "IORB", RATE_LIKE),
+
+    # Credit. HY and IG carry only 3y of history since an ICE licensing change,
+    # which is plenty for a board row and too little for a 5y percentile — so
+    # they appear here but feed no metric. BAA10Y does the analytical work.
+    "hy": SeriesDef("BAMLH0A0HYM2", "HY OAS", RATE_LIKE, quote="bp"),
+    "ig": SeriesDef("BAMLC0A0CM", "IG OAS", RATE_LIKE, quote="bp"),
+    "credit": SeriesDef("BAA10Y", "Baa over 10y", RATE_LIKE, quote="bp"),
+
+    # FX. Yahoo is same-day; FRED's H.10 release runs about nine days behind.
+    "eurusd": SeriesDef("EURUSD=X", "EURUSD", PRICE_LIKE, quote="fx", source="YAHOO"),
+    "usdjpy": SeriesDef("JPY=X", "USDJPY", PRICE_LIKE, quote="fxjpy", source="YAHOO"),
+    # No Yahoo equivalent of the Fed's broad trade-weighted index.
+    "usd": SeriesDef("DTWEXBGS", "Broad dollar", PRICE_LIKE, stale_after_days=12),
+
     "vix": SeriesDef("VIXCLS", "VIX", RATE_LIKE, quote="points"),
-    "wti": SeriesDef("DCOILWTICO", "WTI crude", PRICE_LIKE, stale_after_days=8),  # observed ~5d publication lag
+
+    # Two different instruments, labelled as such rather than conflated:
+    # `crude` is the front-month future (board), `wti` is spot Cushing, which
+    # is the cleaner series for a correlation and feeds the co-movement metric.
+    "crude": SeriesDef("CL=F", "WTI front-month", PRICE_LIKE, quote="commodity",
+                       source="YAHOO", cross_check="DCOILWTICO"),
+    "wti": SeriesDef("DCOILWTICO", "WTI spot", PRICE_LIKE, quote="commodity",
+                     stale_after_days=8),
+    "gold": SeriesDef("GC=F", "Gold", PRICE_LIKE, quote="commodity", source="YAHOO"),
 }
 
 COMOVEMENT_BASKET = ("equity", "ust10", "usd", "credit", "wti", "vix")
@@ -114,9 +157,7 @@ def source_of(key: str) -> str:
     """Which public API a levels key came from."""
     if key.startswith("cot_"):
         return "CFTC"
-    if key in SERIES:
-        return "FRED"
-    raise KeyError(f"unknown levels key: {key}")
+    return SERIES[key].source
 
 
 # Which speculative category each report reports. The two are not

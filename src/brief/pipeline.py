@@ -41,18 +41,22 @@ class Tile:
 def load_levels() -> tuple[dict[str, pd.Series], dict[str, str]]:
     """Fetch everything. A failing source degrades the page, never blanks it."""
     from brief.config import CONTRACTS
-    from brief.sources.cftc import fetch as fetch_cot
+    import brief.sources.cftc as cftc
+    import brief.sources.yahoo as yahoo
 
     levels: dict[str, pd.Series] = {}
     status: dict[str, str] = {}
     for key, definition in SERIES.items():
         try:
-            levels[key] = fetch(definition.fred_id)
+            if definition.source == "YAHOO":
+                levels[key] = yahoo.fetch(definition.series_id)
+            else:
+                levels[key] = fetch(definition.series_id)
         except Exception as exc:
-            status[f"FRED {definition.label} ({definition.fred_id})"] = str(exc)[:120]
+            status[f"{definition.source} {definition.label} ({definition.series_id})"] = str(exc)[:120]
     for key in CONTRACTS:
         try:
-            levels[f"cot_{key}"] = fetch_cot(key)
+            levels[f"cot_{key}"] = cftc.fetch(key)
         except Exception as exc:
             status[f"CFTC {CONTRACTS[key].label}"] = str(exc)[:120]
     return levels, status
