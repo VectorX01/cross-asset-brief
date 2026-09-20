@@ -31,8 +31,9 @@ def test_register_rejects_a_duplicate_name():
 def test_stock_bond_is_positive_when_equities_and_yields_move_together():
     rng = np.random.default_rng(0)
     shock = rng.normal(size=200)
-    equity = pd.Series(100 * np.exp(np.cumsum(shock * 0.01)), index=dates(200))
-    yields = pd.Series(4.0 + np.cumsum(shock * 0.02), index=dates(200))
+    trend = np.linspace(0.0, 1.0, 200)
+    equity = pd.Series(100 * np.exp(np.cumsum(shock * 0.01) + trend * 0.5), index=dates(200))
+    yields = pd.Series(4.0 + np.cumsum(shock * 0.02) - trend * 3.0, index=dates(200))
     out = REGISTRY["stock_bond"].fn({"equity": equity, "ust10": yields})
     assert out.iloc[-1] > 0.9
 
@@ -40,8 +41,9 @@ def test_stock_bond_is_positive_when_equities_and_yields_move_together():
 def test_stock_bond_is_negative_when_they_move_inversely():
     rng = np.random.default_rng(1)
     shock = rng.normal(size=200)
-    equity = pd.Series(100 * np.exp(np.cumsum(shock * 0.01)), index=dates(200))
-    yields = pd.Series(4.0 - np.cumsum(shock * 0.02), index=dates(200))
+    trend = np.linspace(0.0, 1.0, 200)
+    equity = pd.Series(100 * np.exp(np.cumsum(shock * 0.01) + trend * 0.5), index=dates(200))
+    yields = pd.Series(4.0 - np.cumsum(shock * 0.02) + trend * 3.0, index=dates(200))
     out = REGISTRY["stock_bond"].fn({"equity": equity, "ust10": yields})
     assert out.iloc[-1] < -0.9
 
