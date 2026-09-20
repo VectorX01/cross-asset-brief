@@ -12,7 +12,12 @@ from brief.pipeline import build_payload
 
 GOLDEN = Path(__file__).parent / "fixtures" / "golden_payload.json"
 
-# Only the three cross-asset metrics the frozen inputs below actually support.
+# The three cross-asset metrics, all of which the frozen inputs below feed
+# completely: every one of them pins a real number, none records as null.
+# comovement needs the whole six-series basket, so the fixture supplies all
+# six -- a null there would assert only that the metric stays broken, and
+# comovement is the one metric whose value depends on the differencing rule
+# being applied per series kind.
 # Filtering explicitly (rather than deriving from every registered metric)
 # keeps this test independent of test collection order: other test modules
 # (e.g. test_metrics_positioning.py) import brief.metrics.positioning, which
@@ -35,6 +40,18 @@ def frozen_levels():
         "ust10": pd.Series(4.0 + np.cumsum((shock * 0.6 + independent * 0.8) * 0.02), index=idx),
         "credit": pd.Series(4.0 + np.cumsum(rng.normal(size=1500) * 0.01), index=idx),
         "vix": pd.Series(18.0 + np.cumsum(rng.normal(size=1500) * 0.05), index=idx),
+        # usd and wti complete the comovement basket. Both are price-like in
+        # SERIES, and each blends the shared shock with an independent draw so
+        # the pinned correlation lands mid-range rather than at 0 or 1, where
+        # a differencing regression could hide.
+        "usd": pd.Series(
+            100 * np.exp(np.cumsum((shock * -0.4 + rng.normal(size=1500) * 0.9) * 0.004)),
+            index=idx,
+        ),
+        "wti": pd.Series(
+            70 * np.exp(np.cumsum((shock * 0.5 + rng.normal(size=1500) * 0.9) * 0.02)),
+            index=idx,
+        ),
     }
 
 
@@ -47,12 +64,25 @@ def computed():
     }
 
 
+def test_every_golden_metric_pins_a_number_not_a_null():
+    # A null pins only that the metric is broken. comovement recorded as null
+    # for exactly that reason, which is how the differencing rule went
+    # unprotected: the one metric that depends on it asserted nothing.
+    actual = computed()
+    assert set(actual) == set(GOLDEN_METRICS)
+    assert all(value is not None for value in actual.values()), actual
+
+
 def test_computed_values_match_the_golden_file():
+    # Every mismatch is collected before asserting, rather than failing on the
+    # first: when a shared transform drifts it moves several metrics at once,
+    # and the useful signal is which ones.
     expected = json.loads(GOLDEN.read_text())
     actual = computed()
     assert actual.keys() == expected.keys()
-    for name, value in expected.items():
-        if value is None:
-            assert actual[name] is None
-        else:
-            assert actual[name] == pytest.approx(value, abs=1e-8)
+    drifted = {
+        name: {"computed": actual[name], "golden": value}
+        for name, value in expected.items()
+        if actual[name] != pytest.approx(value, abs=1e-8)
+    }
+    assert not drifted, f"computed values no longer match the golden file: {drifted}"
