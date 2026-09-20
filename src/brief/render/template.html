@@ -13,7 +13,8 @@
     --bg: #f9f9f7;          /* page plane, light */
     --fg: #0b0b0b;          /* primary ink */
     --text-2: #52514e;      /* secondary ink */
-    --muted: #898781;       /* muted ink (axis/labels), mode-invariant */
+    --muted: #706e67;       /* muted ink (axis/labels): 4.84:1 on --bg, and it
+                               carries 11-12px text, so it has to clear AA */
     --rule: #e1e0d9;        /* gridline hairline */
     --mark: #0b0b0b;        /* primary-ink marker on the percentile strip */
   }
@@ -22,6 +23,9 @@
       --bg: #0d0d0d;        /* page plane, dark */
       --fg: #ffffff;        /* primary ink, dark */
       --text-2: #c3c2b7;    /* secondary ink, dark */
+      --muted: #898781;     /* muted ink, dark: 5.41:1 on the dark plane. Not
+                               mode-invariant -- one value cannot clear AA
+                               against both planes. */
       --rule: #2c2c2a;      /* gridline hairline, dark */
       --mark: #ffffff;      /* primary-ink marker, dark */
     }
@@ -52,6 +56,16 @@
   .spark polyline { stroke:var(--text-2); stroke-width:2; stroke-linecap:round; stroke-linejoin:round; }
 </style>
 </head>
+{% macro asof(tile) %}
+{# The dotted underline alone is an unlabelled convention: a reader who does
+   not already know it learns nothing. The word and the title say what it
+   means. #}
+{% if tile.stale %}
+<p class="asof stale" title="stale — no newer observation has published yet">as of {{ tile.as_of }} · {{ tile.sources | join(", ") }} · stale</p>
+{% else %}
+<p class="asof">as of {{ tile.as_of }} · {{ tile.sources | join(", ") }}</p>
+{% endif %}
+{% endmacro %}
 <body>
 <main>
   <header>
@@ -90,16 +104,19 @@
   {% if payload.setup %}
   <h2>Setup</h2>
   <section class="tile">
+    <h3>{{ payload.setup.title }}</h3>
     <p class="value">{{ value(payload.setup.value, payload.setup.unit) }}</p>
     {{ strip(payload.setup.pctile) }}
     <p class="sentence">{{ payload.setup.sentence }}</p>
-    <p class="asof {% if payload.setup.stale %}stale{% endif %}">as of {{ payload.setup.as_of }} · {{ payload.setup.sources | join(", ") }}</p>
+    {{ asof(payload.setup) }}
   </section>
   {% endif %}
 
   <h2>Metrics</h2>
   <div class="grid">
-  {% for tile in payload.tiles %}
+  {# The setup metric gets its own block above *instead of* a grid position;
+     identity, not name, so nothing here depends on which metric it is. #}
+  {% for tile in payload.tiles if not tile is sameas payload.setup %}
     <section class="tile">
       <h3>{{ tile.title }}</h3>
       {% if tile.error %}
@@ -111,7 +128,7 @@
         <p class="pct">{{ tile.pctile | ordinal }} percentile {{ tile.context }}</p>
         {{ spark(tile.history) }}
         <p class="sentence">{{ tile.sentence }}</p>
-        <p class="asof {% if tile.stale %}stale{% endif %}">as of {{ tile.as_of }} · {{ tile.sources | join(", ") }}</p>
+        {{ asof(tile) }}
       {% endif %}
     </section>
   {% endfor %}

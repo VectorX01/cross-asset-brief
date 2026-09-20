@@ -355,3 +355,32 @@ def test_the_registered_divergence_metric_is_the_setup_metric():
     from brief.metrics import positioning  # noqa: F401  (registers divergence)
 
     assert REGISTRY["divergence"].role == "setup"
+
+
+def test_the_setup_tile_does_not_also_appear_in_the_grid():
+    # The spec gives the divergence metric its own block *instead of* a grid
+    # position. It was rendering three times on one page.
+    setup = _tile(name="divergence", title="Positioning-price divergence",
+                  value=37.0, pctile=93.0, unit="pctile pts")
+    other = _tile(name="stock_bond", title="Nasdaq vs 10y regime", unit="corr")
+    payload = {
+        "date": "2026-09-20", "tiles": [setup, other], "unusual": [setup],
+        "setup": setup, "source_status": {},
+    }
+    html = render(payload)
+    assert html.count("Positioning-price divergence") == 1
+    assert html.count("Nasdaq vs 10y regime") == 1
+
+
+def test_a_stale_tile_says_the_word_not_just_a_dotted_underline():
+    # An unlabelled dotted underline teaches a reader who does not already
+    # know the convention nothing at all.
+    stale = _tile(stale=True)
+    payload = {
+        "date": "2026-09-20", "tiles": [stale], "unusual": [], "setup": None,
+        "source_status": {},
+    }
+    html = render(payload)
+    assert 'class="asof stale"' in html
+    assert "· stale" in html
+    assert "title=" in html.split('class="asof stale"')[1][:120]
