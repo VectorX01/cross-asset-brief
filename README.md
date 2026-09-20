@@ -18,8 +18,8 @@ extreme, or a cross-asset relationship passes it.
 | Nasdaq vs 10y regime | 60-day rolling correlation of Nasdaq Composite log returns vs 10y Treasury yield changes, percentiled over the full common history |
 | Credit vs vol divergence | 5y percentile of the Baa corporate spread minus 5y percentile of the VIX |
 | Cross-asset co-movement | Mean pairwise absolute 60d correlation across equity, 10y yield, dollar, credit, crude and VIX |
-| Positioning (×5) | Net leveraged-fund position per contract — E-mini S&P 500, 10y Treasury note, US Dollar Index, gold, WTI crude — percentiled over 3 years of weekly CoT reports |
-| Positioning-price divergence | 3y positioning percentile minus 3-month price percentile, for E-mini S&P 500 |
+| Positioning (×5) | Net speculative position per contract, percentiled over 3 years of weekly CoT reports. The category follows the report: **leveraged funds** for E-mini S&P 500, 10y Treasury note and US Dollar Index (Traders in Financial Futures), **managed money** for gold and WTI crude (disaggregated). The two are not interchangeable, and each tile names which one it is showing |
+| Positioning-price divergence | 3y leveraged-fund positioning percentile minus 3-month price percentile, for E-mini S&P 500 |
 | What's unusual today | The top 5 of all 9 tiles above, ranked by distance from each tile's own 50th percentile |
 
 Two substitutions from the original plan, forced by data availability rather

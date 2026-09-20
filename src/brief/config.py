@@ -63,12 +63,25 @@ def source_of(key: str) -> str:
     raise KeyError(f"unknown levels key: {key}")
 
 
+# Which speculative category each report reports. The two are not
+# interchangeable and the category is a property of the report, not a label
+# choice: financial futures come from the Traders in Financial Futures
+# report, physical commodities from the disaggregated report. Naming the
+# wrong one on a page read by a front-office audience is the most costly
+# error available here, so every sentence derives the category from this.
+TRADER_CATEGORY = {"tff": "leveraged funds", "disagg": "managed money"}
+
+
 @dataclass(frozen=True)
 class ContractDef:
     report: str                  # "tff" or "disagg"
     market_codes: tuple[str, ...]  # exact market_and_exchange_names values, oldest first
     label: str
     price_series: str | None   # key into SERIES, or None if no free daily price
+
+    @property
+    def trader_category(self) -> str:
+        return TRADER_CATEGORY[self.report]
 
 
 # price_series for "es" is "spx" (S&P 500), not "equity" (Nasdaq Composite):

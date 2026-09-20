@@ -108,3 +108,36 @@ def test_positioning_sentence_derives_its_window_from_the_constant(monkeypatch):
     sentence = REGISTRY["pos_es"].interpret(120000.0, 50.0)
     assert "7 years" in sentence
     assert "3 years" not in sentence
+
+
+def test_the_trader_category_comes_from_the_report_each_contract_uses():
+    # Financial futures are reported by the TFF report's leveraged funds;
+    # physical commodities by the disaggregated report's managed money. Gold
+    # and WTI positioning is managed money, and calling it leveraged funds is
+    # the single most costly error this page could make to a front-office
+    # reader.
+    from brief.config import CONTRACTS
+
+    assert CONTRACTS["es"].trader_category == "leveraged funds"
+    assert CONTRACTS["ust10"].trader_category == "leveraged funds"
+    assert CONTRACTS["dxy"].trader_category == "leveraged funds"
+    assert CONTRACTS["gold"].trader_category == "managed money"
+    assert CONTRACTS["wti"].trader_category == "managed money"
+
+
+def test_a_positioning_tile_names_its_trader_category():
+    assert "managed money" in REGISTRY["pos_gold"].title
+    assert "managed money" in REGISTRY["pos_gold"].interpret(133116.0, 87.0)
+    assert "leveraged" not in REGISTRY["pos_gold"].interpret(133116.0, 87.0).lower()
+
+    assert "leveraged funds" in REGISTRY["pos_es"].title
+    assert "leveraged funds" in REGISTRY["pos_es"].interpret(120000.0, 50.0)
+
+
+def test_divergence_takes_its_trader_category_from_the_contract_too():
+    from brief.config import CONTRACTS
+    from brief.metrics.positioning import DIVERGENCE_CONTRACT
+
+    category = CONTRACTS[DIVERGENCE_CONTRACT].trader_category
+    for value, pctile in ((70.0, 97.0), (-70.0, 2.0), (0.2, 50.0), (30.0, 50.0)):
+        assert category.lower() in REGISTRY["divergence"].interpret(value, pctile).lower()

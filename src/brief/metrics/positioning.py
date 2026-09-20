@@ -25,14 +25,14 @@ def _positioning_fn(contract_key: str):
     return fn
 
 
-def _interpret_positioning(label: str):
+def _interpret_positioning(label: str, category: str):
     def interpret(value: float, pctile: float) -> str:
         side = "long" if value > 0 else "short"
         # The window is read from the constant at call time rather than
         # written out as prose: the sentence cannot drift from the window the
         # percentile was actually computed over.
         head = (
-            f"{label}: net {side} {abs(value):,.0f} contracts, "
+            f"{label}: {category} net {side} {abs(value):,.0f} contracts, "
             f"{ordinal(pctile)} percentile of {POSITIONING_WINDOW_YEARS} years"
         )
         if pctile >= 90:
@@ -48,11 +48,13 @@ for _key, _contract in CONTRACTS.items():
     register(
         Metric(
             name=f"pos_{_key}",
-            title=f"Positioning — {_contract.label}",
+            title=f"Positioning — {_contract.label} ({_contract.trader_category})",
             inputs=(f"cot_{_key}",),
             context_window=POSITIONING_WINDOW,
             fn=_positioning_fn(_key),
-            interpret=_interpret_positioning(_contract.label),
+            interpret=_interpret_positioning(
+                _contract.label, _contract.trader_category
+            ),
             unit="contracts",
         )
     )
@@ -78,29 +80,35 @@ def _divergence(levels: dict[str, pd.Series]) -> pd.Series:
     return pd.Series(out, name="divergence").dropna()
 
 
+# Whose positioning this metric is about, taken from the contract's report
+# rather than written into the prose -- point it at a physical commodity and
+# the sentence would otherwise still say "leveraged funds".
+DIVERGENCE_CATEGORY = CONTRACTS[DIVERGENCE_CONTRACT].trader_category.capitalize()
+
+
 def _interpret_divergence(value: float, pctile: float) -> str:
     if pctile >= DIVERGENCE_PCTILE:
         return (
-            f"Leveraged funds are {value:.0f} percentile points longer than price "
-            f"justifies ({ordinal(pctile)} percentile of its own history) — a rally "
-            "without sponsorship, vulnerable to long liquidation."
+            f"{DIVERGENCE_CATEGORY} are {value:.0f} percentile points longer than "
+            f"price justifies ({ordinal(pctile)} percentile of its own history) — a "
+            "rally without sponsorship, vulnerable to long liquidation."
         )
     if pctile <= 100 - DIVERGENCE_PCTILE:
         return (
-            f"Leveraged funds are {abs(value):.0f} percentile points shorter than "
-            f"price justifies ({ordinal(pctile)} percentile of its own history) — a "
-            "selloff without capitulation, vulnerable to a squeeze."
+            f"{DIVERGENCE_CATEGORY} are {abs(value):.0f} percentile points shorter "
+            f"than price justifies ({ordinal(pctile)} percentile of its own history) "
+            "— a selloff without capitulation, vulnerable to a squeeze."
         )
     if round(value) == 0:
         return (
-            "Leveraged funds are within a percentile point of what price alone "
-            f"would suggest — {ordinal(pctile)} percentile of this relationship's "
-            "own history."
+            f"{DIVERGENCE_CATEGORY} are within a percentile point of what price "
+            f"alone would suggest — {ordinal(pctile)} percentile of this "
+            "relationship's own history."
         )
     direction = "longer" if value > 0 else "shorter"
     return (
-        f"Leveraged funds sit {abs(value):.0f} percentile points {direction} than "
-        f"price alone would suggest — {ordinal(pctile)} percentile of this "
+        f"{DIVERGENCE_CATEGORY} sit {abs(value):.0f} percentile points {direction} "
+        f"than price alone would suggest — {ordinal(pctile)} percentile of this "
         "relationship's own history."
     )
 
