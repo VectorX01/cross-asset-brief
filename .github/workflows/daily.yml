@@ -1,0 +1,25 @@
+name: daily brief
+
+on:
+  schedule:
+    - cron: "30 12 * * 1-5"   # 12:30 UTC weekdays, after the FRED morning update
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -e ".[dev]"
+      - run: pytest -q -W error
+      - run: python -m brief.cli build
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=cross-asset-brief
