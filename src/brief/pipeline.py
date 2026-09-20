@@ -29,8 +29,16 @@ class Tile:
 
 
 def load_levels() -> dict[str, pd.Series]:
-    """Fetch every configured series' full history."""
-    return {key: fetch(definition.fred_id) for key, definition in SERIES.items()}
+    """Fetch every configured series and contract. Full history, every run."""
+    from brief.config import CONTRACTS
+    from brief.sources.cftc import fetch as fetch_cot
+
+    levels: dict[str, pd.Series] = {}
+    for key, definition in SERIES.items():
+        levels[key] = fetch(definition.fred_id)
+    for key in CONTRACTS:
+        levels[f"cot_{key}"] = fetch_cot(key)
+    return levels
 
 
 def _sources_for(metric) -> tuple[str, ...]:

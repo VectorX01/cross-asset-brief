@@ -3,7 +3,7 @@
 import sys
 from pathlib import Path
 
-from brief.metrics import cross_asset  # noqa: F401  (registers metrics)
+from brief.metrics import cross_asset, positioning  # noqa: F401  (registers metrics)
 from brief.pipeline import build_payload, load_levels
 from brief.render.page import render
 
