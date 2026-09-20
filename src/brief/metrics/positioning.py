@@ -87,13 +87,18 @@ DIVERGENCE_CATEGORY = CONTRACTS[DIVERGENCE_CONTRACT].trader_category.capitalize(
 
 
 def _interpret_divergence(value: float, pctile: float) -> str:
-    if pctile >= NOTABLE_PCTILE:
+    # Both tail branches check the sign as well as the percentile. The
+    # percentile says the reading is unusual; only the sign says which way,
+    # and a metric whose history sits mostly on one side can put a negative
+    # spread in the top decile. Without the sign check the sentence would
+    # argue with the number printed above it.
+    if pctile >= NOTABLE_PCTILE and value > 0:
         return (
             f"{DIVERGENCE_CATEGORY} are {value:.0f} percentile points longer than "
             f"price justifies ({ordinal(pctile)} percentile of its own history) — a "
             "rally without sponsorship, vulnerable to long liquidation."
         )
-    if pctile <= 100 - NOTABLE_PCTILE:
+    if pctile <= 100 - NOTABLE_PCTILE and value < 0:
         return (
             f"{DIVERGENCE_CATEGORY} are {abs(value):.0f} percentile points shorter "
             f"than price justifies ({ordinal(pctile)} percentile of its own history) "

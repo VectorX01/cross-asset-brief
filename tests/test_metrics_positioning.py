@@ -141,3 +141,21 @@ def test_divergence_takes_its_trader_category_from_the_contract_too():
     category = CONTRACTS[DIVERGENCE_CONTRACT].trader_category
     for value, pctile in ((70.0, 97.0), (-70.0, 2.0), (0.2, 50.0), (30.0, 50.0)):
         assert category.lower() in REGISTRY["divergence"].interpret(value, pctile).lower()
+
+
+def test_divergence_tails_never_contradict_their_own_number():
+    # The tail branches asserted a direction from the percentile alone. A
+    # high percentile on a negative spread would have produced "are -20
+    # percentile points longer than price justifies" -- a sentence arguing
+    # with the number printed directly above it.
+    long_tail = REGISTRY["divergence"].interpret(-20.0, 96.0).lower()
+    assert "longer" not in long_tail
+    assert "sponsorship" not in long_tail
+    assert "shorter" in long_tail
+    assert "96th" in long_tail
+
+    short_tail = REGISTRY["divergence"].interpret(30.0, 3.0).lower()
+    assert "shorter" not in short_tail
+    assert "capitulation" not in short_tail
+    assert "longer" in short_tail
+    assert "3rd" in short_tail

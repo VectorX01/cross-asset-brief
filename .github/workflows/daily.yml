@@ -2,7 +2,13 @@ name: daily brief
 
 on:
   schedule:
-    - cron: "30 12 * * 1-5"   # 12:30 UTC weekdays, after the FRED morning update
+    # 21:30 UTC weekdays. CFTC releases the Commitments of Traders on Friday
+    # at ~15:30 ET, which is 19:30 UTC in summer and 20:30 UTC in winter, so
+    # a 12:30 UTC run always preceded the week's release and the new
+    # positioning only ever reached the page on Monday. 21:30 UTC clears the
+    # release in both DST regimes and is still hours after the FRED morning
+    # update, which is what the earlier slot was chosen for.
+    - cron: "30 21 * * 1-5"
   workflow_dispatch:
 
 jobs:
