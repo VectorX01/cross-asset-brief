@@ -85,3 +85,18 @@ def test_mean_abs_pairwise_corr_ignores_the_diagonal():
     out = mean_abs_pairwise_corr(df, window=30)
     assert out.iloc[-1] == pytest.approx(1.0)
     assert len(out) == 31
+
+
+def test_rolling_corr_never_exceeds_one():
+    s = pd.Series(np.arange(80, dtype=float) % 7, index=dates(80))
+    out = rolling_corr(s, s * 3.0 + 1.0, window=30)
+    assert out.max() <= 1.0
+    assert out.min() >= -1.0
+
+
+def test_mean_abs_pairwise_corr_stays_within_unit_interval():
+    s = pd.Series(np.arange(80, dtype=float) % 7, index=dates(80))
+    df = pd.DataFrame({"a": s, "b": s * 2.0, "c": -s})
+    out = mean_abs_pairwise_corr(df, window=30)
+    assert out.max() <= 1.0
+    assert out.min() >= 0.0

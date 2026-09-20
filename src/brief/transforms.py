@@ -56,7 +56,11 @@ def rolling_percentile(s: pd.Series, window: int) -> pd.Series:
 def rolling_corr(a: pd.Series, b: pd.Series, window: int) -> pd.Series:
     """Rolling Pearson correlation of two change series."""
     df = align(a.rename("a"), b.rename("b"))
-    return df["a"].rolling(window).corr(df["b"]).dropna()
+    out = df["a"].rolling(window).corr(df["b"]).dropna()
+    # Pearson correlation is bounded to [-1, 1] by definition; pandas' rolling
+    # implementation can overshoot that by float epsilon. This corrects
+    # floating-point noise, not the metric.
+    return out.clip(-1.0, 1.0)
 
 
 def mean_abs_pairwise_corr(df: pd.DataFrame, window: int) -> pd.Series:
@@ -70,4 +74,8 @@ def mean_abs_pairwise_corr(df: pd.DataFrame, window: int) -> pd.Series:
     abs_sum = corr.abs().groupby(level=0).sum().sum(axis=1)
     complete = corr.notna().groupby(level=0).sum().sum(axis=1) == n * n
     out = (abs_sum - n) / (n * (n - 1))
-    return out.where(complete).dropna()
+    out = out.where(complete).dropna()
+    # A mean of absolute Pearson correlations is bounded to [0, 1] by
+    # definition; the same rolling-correlation float epsilon can push it
+    # past 1.0. This corrects floating-point noise, not the metric.
+    return out.clip(0.0, 1.0)

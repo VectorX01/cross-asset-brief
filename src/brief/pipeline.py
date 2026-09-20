@@ -61,13 +61,6 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
             error=str(exc),
         )
     value = float(series.iloc[-1])
-    if metric.unit == "corr":
-        # Pearson correlation is bounded to [-1, 1] by definition; pandas'
-        # rolling implementation can overshoot that by float epsilon
-        # (observed ~1e-15 on perfectly proportional inputs). Clip the
-        # displayed value rather than let a bounded statistic read as
-        # unbounded — this corrects floating-point noise, not the metric.
-        value = max(-1.0, min(1.0, value))
     pctile = percentile_rank(series, window=metric.context_window)
     return Tile(
         name=metric.name,
