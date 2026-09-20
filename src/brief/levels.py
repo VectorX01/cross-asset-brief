@@ -14,8 +14,8 @@ from datetime import date, timedelta
 
 import pandas as pd
 
-from brief.config import SERIES
-from brief.transforms import PRICE_LIKE, RATE_LIKE, align
+from brief.config import PERCENT_QUOTES, SERIES
+from brief.transforms import RATE_LIKE, align
 
 MONTH = pd.Timedelta(days=30)
 YEAR = pd.Timedelta(days=365)
@@ -28,8 +28,13 @@ class BoardRow:
     kind: str
     quote: str
     level: float
+    # Absolute move in the row's own units, and the percent move where a
+    # percent means anything. A yield going 4.00 -> 4.07 is +7bp, not
+    # +1.75%, so rate-like rows carry None.
     change_1d: float | None
+    change_1d_pct: float | None
     change_1m: float | None
+    change_1m_pct: float | None
     low_1y: float
     high_1y: float
     as_of: str
@@ -37,15 +42,17 @@ class BoardRow:
     stale: bool
 
 
-def _move(latest: float, earlier: float, kind: str) -> float:
-    """A rate moves in its own units; a price moves in percent.
+def _move(latest: float, earlier: float, quote: str) -> tuple[float, float | None]:
+    """The absolute move, and the percent move where one is meaningful.
 
-    This is a display convention and deliberately not the log return the
-    correlation metrics use — nobody quotes a log return in conversation.
+    Keyed on the quote rather than the kind: VIX is rate-like for the
+    differencing maths but is quoted "-2.27 (-12.8%)", while a percent on a
+    yield means nothing. Whether a percent belongs is a display question.
     """
-    if kind == PRICE_LIKE:
-        return (latest / earlier - 1.0) * 100.0
-    return latest - earlier
+    absolute = latest - earlier
+    if quote in PERCENT_QUOTES and earlier != 0:
+        return absolute, (latest / earlier - 1.0) * 100.0
+    return absolute, None
 
 
 def board_row(
@@ -59,10 +66,14 @@ def board_row(
     last_date = observed.index[-1]
     level = float(observed.iloc[-1])
 
-    change_1d = _move(level, float(observed.iloc[-2]), kind) if len(observed) > 1 else None
+    change_1d, change_1d_pct = (
+        _move(level, float(observed.iloc[-2]), quote) if len(observed) > 1 else (None, None)
+    )
 
     a_month_back = observed.asof(last_date - MONTH)
-    change_1m = None if pd.isna(a_month_back) else _move(level, float(a_month_back), kind)
+    change_1m, change_1m_pct = (
+        (None, None) if pd.isna(a_month_back) else _move(level, float(a_month_back), quote)
+    )
 
     trailing_year = observed[observed.index > last_date - YEAR]
 
@@ -73,7 +84,9 @@ def board_row(
         quote=quote,
         level=level,
         change_1d=change_1d,
+        change_1d_pct=change_1d_pct,
         change_1m=change_1m,
+        change_1m_pct=change_1m_pct,
         low_1y=float(trailing_year.min()),
         high_1y=float(trailing_year.max()),
         as_of=str(last_date.date()),

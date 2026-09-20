@@ -171,3 +171,43 @@ def test_a_spread_takes_the_wider_tolerance_of_its_two_legs():
     # usd tolerates 12 days, ust10 tolerates 5; the spread cannot be fresher
     # than its slowest leg, so it must not be judged against the stricter gate.
     assert board[0].rows[0].stale_after_days == 12
+
+
+# --- front-office quoting --------------------------------------------------
+# A desk quotes an equity index as "level, points, percent" and a yield as
+# basis points only. A percent change on a yield is meaningless (a move from
+# 4.00 to 4.07 is not "+1.75%"), so rate-like rows carry no percent at all.
+
+def test_a_price_row_carries_both_the_points_move_and_the_percent():
+    row = board_row(daily([100.0, 110.0]), key="spx", label="S&P 500",
+                    kind=PRICE_LIKE, quote="index", stale_after_days=5)
+    assert row.change_1d == pytest.approx(10.0)
+    assert row.change_1d_pct == pytest.approx(10.0)
+
+
+def test_a_yield_row_carries_no_percent_because_it_would_be_meaningless():
+    row = board_row(daily([4.00, 4.07]), key="ust10", label="10y",
+                    kind=RATE_LIKE, quote="yield", stale_after_days=5)
+    assert row.change_1d == pytest.approx(0.07)
+    assert row.change_1d_pct is None
+
+
+def test_the_month_move_carries_a_percent_too_for_a_price():
+    series = daily([100.0] * 40 + [125.0])
+    row = board_row(series, key="spx", label="S&P 500",
+                    kind=PRICE_LIKE, quote="index", stale_after_days=5)
+    assert row.change_1m_pct == pytest.approx(25.0)
+
+
+def test_whether_a_percent_is_carried_follows_the_quote_not_the_kind():
+    """VIX is rate-like for the differencing maths but is quoted "-2.27
+    (-12.8%)"; a yield is rate-like and a percent on it is meaningless. The
+    two differ by quote, so the quote is what must decide."""
+    vix = board_row(daily([17.71, 15.44]), key="vix", label="VIX",
+                    kind=RATE_LIKE, quote="points", stale_after_days=5)
+    assert vix.change_1d == pytest.approx(-2.27)
+    assert vix.change_1d_pct == pytest.approx(-12.817, abs=1e-3)
+
+    tenor = board_row(daily([4.00, 4.07]), key="ust10", label="10y",
+                      kind=RATE_LIKE, quote="yield", stale_after_days=5)
+    assert tenor.change_1d_pct is None

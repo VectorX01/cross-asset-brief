@@ -2,13 +2,20 @@ name: daily brief
 
 on:
   schedule:
-    # 21:30 UTC weekdays. CFTC releases the Commitments of Traders on Friday
-    # at ~15:30 ET, which is 19:30 UTC in summer and 20:30 UTC in winter, so
-    # a 12:30 UTC run always preceded the week's release and the new
-    # positioning only ever reached the page on Monday. 21:30 UTC clears the
-    # release in both DST regimes and is still hours after the FRED morning
-    # update, which is what the earlier slot was chosen for.
-    - cron: "30 21 * * 1-5"
+    # Hourly through the US session, then once after the close.
+    #
+    # 13:30-21:30 UTC is 09:30-17:30 ET in summer and 08:30-16:30 in winter,
+    # so this brackets the cash session in both DST regimes and the last run
+    # clears the CFTC Commitments of Traders release (Friday ~15:30 ET).
+    #
+    # Only the Yahoo-sourced rows -- equities, crude, gold, FX -- actually
+    # move between these runs. Everything from FRED publishes daily at best,
+    # and the metrics are daily and weekly by nature, so the analysis half of
+    # the page is unchanged within a day. Nine runs on weekdays is about 200
+    # deployments a month, which stays well inside Cloudflare Pages' free
+    # allowance; running around the clock would roughly triple that to rebuild
+    # a page nobody is reading at 04:00.
+    - cron: "30 13-21 * * 1-5"
   workflow_dispatch:
 
 jobs:
