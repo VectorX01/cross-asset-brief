@@ -206,3 +206,33 @@ def test_a_stale_setup_tile_is_marked_stale_in_its_own_section():
     setup_section = html.split("<h2>Setup</h2>")[1].split("<h2>Metrics</h2>")[0]
     assert 'class="asof stale"' in setup_section
     assert "CFTC" in setup_section and "FRED" in setup_section
+
+
+def test_tile_for_survives_a_metric_that_returns_an_empty_series():
+    # FRED has truncated this project's series twice already; a metric whose
+    # window outruns the history it was given must degrade to one unavailable
+    # tile, not take the whole page down.
+    metric = Metric(
+        name="empty", title="Empty", inputs=("equity",), context_window=None,
+        fn=lambda levels: pd.Series(dtype=float, index=pd.DatetimeIndex([])),
+        interpret=lambda value, pctile: "never reached", unit="",
+    )
+    tile = _tile_for(metric, synthetic_levels())
+    assert tile.value is None
+    assert tile.error
+
+
+def test_tile_for_marks_a_series_too_short_to_rank_unavailable():
+    # percentile_rank returns NaN for n < 2. Percentile is the page's only
+    # vocabulary, so a tile that cannot produce one has nothing to say -- and
+    # a NaN must never reach ordinal(), which raises on it.
+    idx = pd.bdate_range("2026-09-01", periods=1)
+    metric = Metric(
+        name="one_point", title="One point", inputs=("equity",), context_window=None,
+        fn=lambda levels: pd.Series([1.0], index=idx),
+        interpret=lambda value, pctile: "never reached", unit="",
+    )
+    tile = _tile_for(metric, synthetic_levels())
+    assert tile.value is None
+    assert tile.pctile is None
+    assert "percentile" in tile.error

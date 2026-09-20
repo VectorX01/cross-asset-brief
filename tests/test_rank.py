@@ -39,3 +39,10 @@ def test_returns_at_most_the_requested_count():
 
 def test_empty_input_is_not_an_error():
     assert rank_anomalies([]) == []
+
+
+def test_excludes_a_nan_percentile():
+    # A NaN percentile poisons the sort key: NaN comparisons are all False, so
+    # a tile carrying one silently scrambles the ranking instead of dropping out.
+    ranked = rank_anomalies([tile("nan", float("nan")), tile("ok", 80.0)])
+    assert [t.name for t in ranked] == ["ok"]

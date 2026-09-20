@@ -1,5 +1,6 @@
 """Fetch, compute, assemble. Stateless: a missed run costs nothing."""
 
+import math
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -92,26 +93,36 @@ def _tile_for(metric, levels: dict[str, pd.Series]) -> Tile:
     missing = [name for name in metric.inputs if name not in levels]
     if missing:
         return _unavailable(metric, f"missing input {', '.join(missing)}")
+    # Everything that touches the computed series stays inside this block.
+    # An empty series raises IndexError on .iloc[-1], and a series too short
+    # to rank yields a NaN percentile that would reach ordinal() and raise at
+    # render time -- both of which are exactly the "broken metric" the except
+    # clause exists to contain. A short series is not hypothetical: FRED has
+    # truncated this project's series twice (see config.py).
     try:
         series = metric.fn({name: levels[name] for name in metric.inputs})
+        value = float(series.iloc[-1])
+        pctile = percentile_rank(series, window=metric.context_window)
+        if pctile is None or math.isnan(pctile):
+            # Percentile is the page's only vocabulary. A tile that cannot
+            # produce one has nothing to say, so it says so.
+            return _unavailable(metric, "not enough history for a percentile")
+        last = series.index[-1].date()
+        stale = (date.today() - last) > timedelta(days=_staleness_gate(metric))
+        return Tile(
+            name=metric.name,
+            title=metric.title,
+            value=value,
+            pctile=pctile,
+            sentence=metric.interpret(value, pctile),
+            history=[float(v) for v in series.iloc[-SPARK_POINTS:]],
+            as_of=str(last),
+            unit=metric.unit,
+            sources=_sources_for(metric),
+            stale=stale,
+        )
     except Exception as exc:  # a broken metric must not take the page down
         return _unavailable(metric, str(exc))
-    value = float(series.iloc[-1])
-    pctile = percentile_rank(series, window=metric.context_window)
-    last = series.index[-1].date()
-    stale = (date.today() - last) > timedelta(days=_staleness_gate(metric))
-    return Tile(
-        name=metric.name,
-        title=metric.title,
-        value=value,
-        pctile=pctile,
-        sentence=metric.interpret(value, pctile),
-        history=[float(v) for v in series.iloc[-SPARK_POINTS:]],
-        as_of=str(series.index[-1].date()),
-        unit=metric.unit,
-        sources=_sources_for(metric),
-        stale=stale,
-    )
 
 
 def build_payload(levels: dict[str, pd.Series], source_status: dict[str, str] | None = None) -> dict:
