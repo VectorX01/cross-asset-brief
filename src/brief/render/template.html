@@ -90,7 +90,7 @@
   {% if payload.setup %}
   <h2>Setup</h2>
   <section class="tile">
-    <p class="value">{{ "%+.0f"|format(payload.setup.value) }}</p>
+    <p class="value">{{ value(payload.setup.value, payload.setup.unit) }}</p>
     {{ strip(payload.setup.pctile) }}
     <p class="sentence">{{ payload.setup.sentence }}</p>
     <p class="asof {% if payload.setup.stale %}stale{% endif %}">as of {{ payload.setup.as_of }} · {{ payload.setup.sources | join(", ") }}</p>
@@ -106,7 +106,7 @@
         <p class="sentence">unavailable — {{ tile.error }}</p>
         <p class="asof">{{ tile.sources | join(", ") }}</p>
       {% else %}
-        <p class="value">{{ "%+.2f"|format(tile.value) }}</p>
+        <p class="value">{{ value(tile.value, tile.unit) }}</p>
         {{ strip(tile.pctile) }}
         <p class="pct">{{ tile.pctile | ordinal }} percentile {{ tile.context }}</p>
         {{ spark(tile.history) }}

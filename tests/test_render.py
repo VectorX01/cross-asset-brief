@@ -4,7 +4,7 @@ import pandas as pd
 from brief.metrics import cross_asset  # noqa: F401
 from brief.metrics.registry import REGISTRY, Metric
 from brief.pipeline import STALE_AFTER_DAYS, Tile, _staleness_gate, _tile_for, build_payload
-from brief.render.page import render
+from brief.render.page import format_value, render
 from brief.render.svg import percentile_strip, sparkline
 
 
@@ -268,3 +268,48 @@ def test_a_window_longer_than_the_history_reports_the_history_it_has():
         interpret=lambda value, pctile: "n/a", unit="",
     )
     assert _tile_for(metric, synthetic_levels()).context == "since 2025"
+
+
+def _tile(**overrides):
+    fields = dict(
+        name="t", title="T", value=1.0, pctile=50.0, sentence="s",
+        history=[1.0, 2.0], as_of="2026-09-20", unit="", context="since 2020",
+        sources=("FRED",),
+    )
+    fields.update(overrides)
+    return Tile(**fields)
+
+
+def test_headline_values_are_formatted_by_their_unit():
+    # Every tile used "%+.2f" regardless of unit, so five of nine showed a
+    # headline like -1868126.00: no separator, two meaningless decimals, no
+    # unit -- directly above prose that formatted the same number correctly.
+    assert format_value(0.41, "corr") == "+0.41"
+    assert format_value(-0.41, "corr") == "-0.41"
+    assert format_value(5.4, "pctile pts") == "+5 pctile pts"
+    assert format_value(-1868126.0, "contracts") == "-1,868,126 contracts"
+    assert format_value(133116.0, "contracts") == "+133,116 contracts"
+
+
+def test_an_unknown_unit_still_renders_a_number():
+    assert format_value(1.5, "furlongs") == "+1.50"
+
+
+def test_a_positioning_headline_renders_with_separators_not_raw_float():
+    tile = _tile(name="pos_es", value=-1868126.0, unit="contracts")
+    payload = {
+        "date": "2026-09-20", "tiles": [tile], "unusual": [], "setup": None,
+        "source_status": {},
+    }
+    html = render(payload)
+    assert "-1,868,126 contracts" in html
+    assert "-1868126.00" not in html
+
+
+def test_the_setup_headline_is_formatted_by_unit_too():
+    tile = _tile(name="divergence", value=37.4, unit="pctile pts")
+    payload = {
+        "date": "2026-09-20", "tiles": [tile], "unusual": [], "setup": tile,
+        "source_status": {},
+    }
+    assert "+37 pctile pts" in render(payload)
