@@ -82,3 +82,25 @@ def test_parse_raises_when_no_row_carries_the_position_fields():
     ]
     with pytest.raises(CftcError):
         parse_positions(stripped, "tff")
+
+
+def test_a_transport_failure_reports_the_contract_not_the_url(monkeypatch):
+    # The CFTC URL carries no secret, but the same rule applies: a raw
+    # requests exception string is not something to put on a public page.
+    import requests
+
+    import brief.sources.cftc as cftc
+
+    def boom(*args, **kwargs):
+        raise requests.Timeout(
+            "HTTPSConnectionPool(host='publicreporting.cftc.gov', port=443): "
+            "Read timed out. (read timeout=60)"
+        )
+
+    monkeypatch.setattr(cftc.requests, "get", boom)
+    with pytest.raises(CftcError) as excinfo:
+        cftc.fetch("gold")
+
+    message = str(excinfo.value)
+    assert "publicreporting.cftc.gov" not in message
+    assert "gold" in message and "Timeout" in message

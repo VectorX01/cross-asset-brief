@@ -79,8 +79,16 @@ def fetch(contract_key: str) -> pd.Series:
     """
     contract = CONTRACTS[contract_key]
     dataset = DATASETS[contract.report]
-    pieces = [
-        _fetch_one(dataset, market_code, contract.report)
-        for market_code in contract.market_codes
-    ]
+    try:
+        pieces = [
+            _fetch_one(dataset, market_code, contract.report)
+            for market_code in contract.market_codes
+        ]
+    except requests.RequestException as exc:
+        # Caught here rather than in _fetch_one because this is the level that
+        # knows the contract key. Only that key and the exception type cross
+        # the boundary: a raw requests exception string embeds the request URL,
+        # and whatever is raised here is rendered on a public page and logged
+        # in public CI. Same rule as fred.py, where the URL carries the key.
+        raise CftcError(f"{contract_key}: {type(exc).__name__}") from None
     return splice(pieces)
