@@ -62,6 +62,18 @@
   /* Levels board. auto-fill rather than a fixed column count so eleven
      tenors sit five-across on a laptop and two-across on a phone without a
      media query, and so a shorter section does not leave a ragged gap. */
+  .sched { list-style:none; margin:0; padding:0; }
+  .sched-row { display:grid; grid-template-columns:62px 68px 1fr; gap:10px;
+               padding:5px 0; border-top:1px solid var(--rule); font-size:13px; }
+  @media (max-width:520px) { .sched-row { grid-template-columns:52px 1fr; }
+                             .sched-kind { display:none; } }
+  .sched-date { color:var(--muted); font-variant-numeric:tabular-nums; }
+  .sched-today .sched-date { color:var(--fg); font-weight:600; }
+  .sched-kind { color:var(--muted); font-size:11px; letter-spacing:0.04em;
+                text-transform:uppercase; align-self:center; }
+  .up { color:var(--up); }
+  .flat { color:var(--muted); }
+  .down { color:var(--down); }
   .checks { font-size:12px; color:var(--muted); margin:14px 0 0; }
   .board-title { font-size:12px; font-weight:600; color:var(--muted);
                  margin:18px 0 8px; letter-spacing:0.04em; }
@@ -122,6 +134,19 @@
     </span>
   </header>
 
+  {% if payload.calendar %}
+  <h2>What's scheduled</h2>
+  <ul class="sched">
+    {% for e in payload.calendar %}
+    <li class="sched-row {% if e.date == payload.date %}sched-today{% endif %}">
+      <span class="sched-date">{% if e.date == payload.date %}today{% else %}{{ e.date[5:] }}{% endif %}</span>
+      <span class="sched-kind">{{ e.kind }}</span>
+      <span class="sched-what">{{ e.label }}{% if e.time %} <span class="board-sep">{{ e.time }}</span>{% endif %}</span>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
   {% if payload.checks %}
   {% set failed = payload.checks | rejectattr("ok") | list %}
   <p class="checks">
@@ -152,6 +177,34 @@
     {% endfor %}
     </div>
   {% endfor %}
+  {% endif %}
+
+  {% if payload.fed_path %}
+  <h2>Fed pricing</h2>
+  <p class="sentence">{{ payload.fed_summary }}</p>
+  <div class="board">
+    {% for p in payload.fed_path %}
+    <div class="board-cell">
+      <span class="board-label">{{ p.label }}</span>
+      <span class="board-level">{{ "%.3f"|format(p.implied) }}</span>
+      {% if p.change_bp is not none %}
+      <span class="board-move {{ direction(p.change_bp) }}">{{ "%+.0f"|format(p.change_bp) }}bp <span class="board-sep">vs EFFR</span></span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="asof">Implied average effective fed funds rate, from 30-day fed funds futures.
+    Quoted by delivery month rather than by meeting: a meeting mid-month splits the
+    contract, and backing out a per-meeting probability needs an assumption about where
+    in the month the change lands.</p>
+  {% endif %}
+
+  {% if payload.sectors %}
+  <h2>Sector leadership</h2>
+  <p class="sentence">
+    Led by {% for r in payload.sectors[:3] %}{{ r.label }} <span class="{{ direction(r.change_1d_pct) }}">{{ "%+.2f"|format(r.change_1d_pct) }}%</span>{% if not loop.last %}, {% endif %}{% endfor %};
+    lagged by {% for r in payload.sectors[-3:] %}{{ r.label }} <span class="{{ direction(r.change_1d_pct) }}">{{ "%+.2f"|format(r.change_1d_pct) }}%</span>{% if not loop.last %}, {% endif %}{% endfor %}.
+  </p>
   {% endif %}
 
   <h2>What's unusual today</h2>

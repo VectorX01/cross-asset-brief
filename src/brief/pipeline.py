@@ -7,7 +7,9 @@ from datetime import date, timedelta
 import pandas as pd
 
 from brief.config import BOARD_SECTIONS, BOARD_SPREADS, CROSS_CHECKS, SERIES, source_of
+from brief.calendar import order, parse_auctions, parse_fed_calendar, parse_fred_releases
 from brief.crosscheck import run_checks
+from brief.fedpath import build_path, summarise
 from brief.levels import build_board
 from brief.metrics.registry import REGISTRY
 from brief.sources.fred import fetch
@@ -172,10 +174,63 @@ def run_cross_checks(levels: dict[str, pd.Series]) -> list:
     return run_checks(levels, CROSS_CHECKS, partner)
 
 
+def load_schedule(days: int = 7) -> tuple[list, dict[str, str]]:
+    """Today through `days` ahead. A feed that fails costs its own rows, not
+    the section: a dead Treasury endpoint must not take the Fed speakers with
+    it."""
+    import brief.sources.schedule as schedule
+
+    start = date.today()
+    end = start + timedelta(days=days)
+    lo, hi = str(start), str(end)
+
+    events, failures = [], {}
+    for name, work in (
+        ("FRED releases", lambda: parse_fred_releases(schedule.fred_release_dates(lo, hi), lo, hi)),
+        ("Fed calendar", lambda: parse_fed_calendar(schedule.fed_calendar(), lo, hi)),
+        ("Treasury auctions", lambda: parse_auctions(schedule.treasury_upcoming(), lo, hi)),
+    ):
+        try:
+            events.extend(work())
+        except Exception as exc:
+            failures[name] = str(exc)[:120]
+    return order(events), failures
+
+
+def load_fed_path(levels: dict[str, pd.Series], count: int = 4) -> tuple[list, str]:
+    """What fed funds futures have priced, anchored on the current EFFR."""
+    import brief.sources.yahoo as yahoo
+
+    effr = levels.get("effr")
+    current = float(effr.dropna().iloc[-1]) if effr is not None and not effr.dropna().empty else None
+
+    def last_price(symbol: str) -> float:
+        return float(yahoo.fetch(symbol).dropna().iloc[-1])
+
+    path = build_path(date.today(), count, last_price, current)
+    return path, summarise(path)
+
+
+def sector_moves(board: list) -> list:
+    """Sector rows, best first. "Which sectors led" is the whole question."""
+    from brief.config import SECTORS
+
+    rows = [
+        row
+        for section in board
+        for row in section.rows
+        if row.key in SECTORS and row.change_1d_pct is not None
+    ]
+    return sorted(rows, key=lambda r: r.change_1d_pct, reverse=True)
+
+
 def build_payload(
     levels: dict[str, pd.Series],
     source_status: dict[str, str] | None = None,
     checks: list | None = None,
+    calendar: list | None = None,
+    fed_path: list | None = None,
+    fed_summary: str = "",
 ) -> dict:
     # Imported locally, not at module level: rank.py imports Tile from this
     # module, so a top-level import here would reintroduce that cycle.
@@ -184,6 +239,7 @@ def build_payload(
     # The metric declares its own role; the pipeline never knows which metric
     # it is looking at. Branching on t.name == "divergence" here meant a
     # rename would have made the Setup block silently vanish.
+    board = build_board(levels, sections=BOARD_SECTIONS, spreads=BOARD_SPREADS)
     tiles, setup = [], None
     for metric in REGISTRY.values():
         tile = _tile_for(metric, levels)
@@ -195,7 +251,11 @@ def build_payload(
         "tiles": tiles,
         "unusual": rank_anomalies(tiles),
         "setup": setup,
-        "board": build_board(levels, sections=BOARD_SECTIONS, spreads=BOARD_SPREADS),
+        "board": board,
         "checks": checks or [],
+        "calendar": calendar or [],
+        "fed_path": fed_path or [],
+        "fed_summary": fed_summary,
+        "sectors": sector_moves(board),
         "source_status": source_status or {},
     }

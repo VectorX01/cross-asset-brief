@@ -11,6 +11,8 @@ layer without adding anything. Unofficial either way, which is why the
 cross-check in `brief.crosscheck` exists.
 """
 
+import time
+
 import pandas as pd
 import requests
 
@@ -53,12 +55,23 @@ def parse_chart(payload: dict) -> pd.Series:
     return pd.Series(values, index=pd.DatetimeIndex(dates), name="close").sort_index()
 
 
-def fetch(symbol: str, *, range_: str = "2y", interval: str = "1d") -> pd.Series:
-    """One symbol's closes. Two years is enough for a trailing-year range."""
+def fetch(symbol: str, *, since: int = 0, interval: str = "1d") -> pd.Series:
+    """One symbol's full daily history.
+
+    Requested as an explicit date range rather than `range=max`, which
+    silently downsamples to monthly -- 170 points across 42 years, all
+    first-of-month. The metrics take 60-day rolling correlations and
+    five-year percentiles, so monthly data would not fail loudly; it would
+    just be wrong.
+    """
     try:
         response = requests.get(
             f"{BASE}/{symbol}",
-            params={"range": range_, "interval": interval},
+            params={
+                "period1": since,
+                "period2": int(time.time()) + 86400,
+                "interval": interval,
+            },
             headers=HEADERS,
             timeout=TIMEOUT,
         )
