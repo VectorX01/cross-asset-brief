@@ -176,24 +176,28 @@ def test_unusual_and_setup_sections_render_with_a_correctly_suffixed_ordinal():
 
 
 def test_load_levels_keeps_going_when_one_source_fails(monkeypatch):
+    """One dead series must not take the others down with it. Every source is
+    stubbed: a test that reaches the network is slow, flaky, and not a test of
+    this function."""
     import brief.pipeline as pipeline
 
-    def fake_fred(series_id, api_key=None):
-        if series_id == "VIXCLS":
-            raise RuntimeError("HTTP 503")
-        return pd.Series([1.0, 2.0], index=pd.bdate_range("2026-01-01", periods=2))
+    stub = pd.Series([1.0, 2.0], index=pd.bdate_range("2026-01-01", periods=2))
 
-    def fake_cot(contract_key):
-        return pd.Series([1.0, 2.0], index=pd.bdate_range("2026-01-01", periods=2))
+    def fake_fred(series_id, api_key=None):
+        if series_id == "DGS10":
+            raise RuntimeError("HTTP 503")
+        return stub
 
     monkeypatch.setattr(pipeline, "fetch", fake_fred)
-    monkeypatch.setattr("brief.sources.cftc.fetch", fake_cot)
+    monkeypatch.setattr("brief.sources.yahoo.fetch", lambda symbol: stub)
+    monkeypatch.setattr("brief.sources.cftc.fetch", lambda contract_key: stub)
 
     levels, status = pipeline.load_levels()
 
-    assert "vix" not in levels
-    assert "equity" in levels and "ust10" in levels
-    assert any("VIXCLS" in key or "vix" in key for key in status)
+    assert "ust10" not in levels, "the failing series is absent"
+    assert "ust2" in levels, "a healthy FRED series survives its neighbour's failure"
+    assert "equity" in levels, "a healthy Yahoo series is untouched by a FRED failure"
+    assert any("DGS10" in key for key in status)
     assert any("503" in message for message in status.values())
 
 
@@ -445,7 +449,7 @@ def test_an_unavailable_tile_still_explains_what_the_metric_would_have_shown():
 def test_build_payload_assembles_the_levels_board_from_the_loaded_series():
     payload = build_payload(synthetic_levels())
     titles = [section.title for section in payload["board"]]
-    assert "Equities" in titles
+    assert "Equities and vol" in titles
     keys = [row.key for section in payload["board"] for row in section.rows]
     assert "equity" in keys and "ust10" in keys
 
@@ -453,7 +457,7 @@ def test_build_payload_assembles_the_levels_board_from_the_loaded_series():
 def test_the_board_omits_sections_whose_series_all_failed_to_load():
     payload = build_payload({"equity": synthetic_levels()["equity"]})
     titles = [section.title for section in payload["board"]]
-    assert titles == ["Equities"]
+    assert titles == ["Equities and vol"]
 
 
 # --- quote conventions -----------------------------------------------------
@@ -613,3 +617,21 @@ def test_a_page_with_every_cross_check_passing_says_so_briefly():
     )
     html = render(payload)
     assert "cross-checks ok" in html.lower()
+
+
+def test_a_sector_leader_that_is_still_down_is_coloured_red_not_green():
+    """On a day when everything falls, the best sector is still negative.
+    Colour follows the sign, never the rank."""
+    from brief.levels import BoardSection
+
+    payload = build_payload(synthetic_levels())
+    payload["sectors"] = [
+        _row(key="xlc", label="Comm svcs", quote="index", level=104.0,
+             change_1d=-0.6, change_1d_pct=-0.59),
+        _row(key="xlk", label="Technology", quote="index", level=162.0,
+             change_1d=-13.0, change_1d_pct=-8.00),
+    ]
+    html = render(payload)
+    leader = html[html.index("Led by"):html.index("lagged by")]
+    assert 'class="down"' in leader
+    assert 'class="up"' not in leader

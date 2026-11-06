@@ -122,7 +122,8 @@ SERIES: dict[str, SeriesDef] = {
     # No Yahoo equivalent of the Fed's broad trade-weighted index.
     "usd": SeriesDef("DTWEXBGS", "Broad dollar", PRICE_LIKE, stale_after_days=12),
 
-    "vix": SeriesDef("VIXCLS", "VIX", RATE_LIKE, quote="points"),
+    "vix": SeriesDef("^VIX", "VIX", RATE_LIKE, quote="points", source="YAHOO",
+                     cross_check=("FRED", "VIXCLS"), cross_check_tolerance=2.0),
 
     # Two different instruments, labelled as such rather than conflated:
     # `crude` is the front-month future (board), `wti` is spot Cushing, which
@@ -133,14 +134,34 @@ SERIES: dict[str, SeriesDef] = {
     "wti": SeriesDef("DCOILWTICO", "WTI spot", PRICE_LIKE, quote="commodity",
                      stale_after_days=8),
     "gold": SeriesDef("GC=F", "Gold", PRICE_LIKE, quote="commodity", source="YAHOO"),
+    "brent": SeriesDef("BZ=F", "Brent", PRICE_LIKE, quote="commodity", source="YAHOO"),
+    # The ICE dollar index a desk actually quotes, rather than the Fed's
+    # trade-weighted broad index, which also publishes nine days in arrears.
+    "dxy": SeriesDef("DX-Y.NYB", "DXY", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlk": SeriesDef("XLK", "Technology", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlf": SeriesDef("XLF", "Financials", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xly": SeriesDef("XLY", "Cons disc", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlc": SeriesDef("XLC", "Comm svcs", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xli": SeriesDef("XLI", "Industrials", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlv": SeriesDef("XLV", "Health care", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlp": SeriesDef("XLP", "Cons staples", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xle": SeriesDef("XLE", "Energy", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlu": SeriesDef("XLU", "Utilities", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlb": SeriesDef("XLB", "Materials", PRICE_LIKE, quote="index", source="YAHOO"),
+    "xlre": SeriesDef("XLRE", "Real estate", PRICE_LIKE, quote="index", source="YAHOO"),
 }
 
 COMOVEMENT_BASKET = ("equity", "ust10", "usd", "credit", "wti", "vix")
 
 # The levels board: reference, not analysis. Sections render in this order,
 # and a key that failed to load is simply absent rather than blank.
+# The eleven S&P sector ETFs, in the order a heat map usually lists them.
+SECTORS: tuple[str, ...] = (
+    "xlk", "xlf", "xly", "xlc", "xli", "xlv", "xlp", "xle", "xlu", "xlb", "xlre",
+)
+
 BOARD_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("Equities", ("spx", "equity", "vix")),
+    ("Rates and the Fed", ("ust2", "ust10", "ust30")),
     (
         "Treasury curve",
         (
@@ -150,13 +171,11 @@ BOARD_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     ("Real and inflation", ("real10", "be10")),
     ("Funding", ("sofr", "effr", "iorb")),
+    ("Equities and vol", ("spx", "equity", "vix")),
+    ("Sectors", SECTORS),
+    ("FX", ("dxy", "eurusd", "usdjpy", "usd")),
+    ("Commodities", ("crude", "brent", "gold")),
     ("Credit", ("hy", "ig", "credit")),
-    ("FX", ("eurusd", "usdjpy", "usd")),
-    # Spot Cushing is deliberately absent: it feeds the co-movement metric,
-    # but FRED publishes it several days late, so beside the front-month it
-    # showed a gap that was staleness rather than basis. The cross-check
-    # reconciles the two instead.
-    ("Commodities", ("crude", "gold")),
 )
 
 # (display label, section, short leg, long leg). The spread is long minus
@@ -164,8 +183,8 @@ BOARD_SECTIONS: tuple[tuple[str, tuple[str, ...]], ...] = (
 # and SOFR above IORB means secured funding is bidding above what the Fed pays
 # on reserves -- the first place money-market stress shows up.
 BOARD_SPREADS: tuple[tuple[str, str, str, str], ...] = (
-    ("2s10s", "Treasury curve", "ust2", "ust10"),
-    ("3m10y", "Treasury curve", "ust3mo", "ust10"),
+    ("2s10s", "Rates and the Fed", "ust2", "ust10"),
+    ("3m10y", "Rates and the Fed", "ust3mo", "ust10"),
     ("SOFR\u2212IORB", "Funding", "iorb", "sofr"),
 )
 

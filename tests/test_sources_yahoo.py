@@ -99,3 +99,28 @@ def test_fetch_wraps_a_transport_failure_without_leaking_the_url(monkeypatch):
         fetch("GC=F")
     assert "query1.finance.yahoo.com" not in str(caught.value)
     assert "GC=F" in str(caught.value)
+
+
+def test_history_is_requested_by_date_range_because_range_max_returns_monthly(monkeypatch):
+    """`range=max&interval=1d` silently downsamples to monthly: 170 points
+    across 42 years, all first-of-month. A 60-day rolling correlation on that
+    would produce confident nonsense, so the request uses period1/period2,
+    which does return daily (9,283 points for VIX, matching FRED exactly)."""
+    seen = {}
+
+    class Response:
+        status_code = 200
+
+        def json(self):
+            return payload()
+
+    def fake_get(url, params=None, headers=None, timeout=None):
+        seen.update(params or {})
+        return Response()
+
+    monkeypatch.setattr("brief.sources.yahoo.requests.get", fake_get)
+    fetch("^VIX")
+
+    assert seen.get("interval") == "1d"
+    assert "period1" in seen and "period2" in seen
+    assert "range" not in seen

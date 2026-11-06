@@ -1,11 +1,42 @@
 # Cross-asset daily brief
 
-A macro brief, rebuilt hourly through the US session that surfaces what is statistically unusual today
+A desk-style macro brief, rebuilt hourly through the US session that surfaces what is statistically unusual today
 rather than what the levels are. Nine metrics, built from two public
 sources — FRED and the CFTC Commitments of Traders — rendered to a single
 static HTML page with no backend and no client-side JavaScript.
 
 ![Screenshot of the rendered brief](docs/img/screenshot.png)
+
+## What's on it
+
+Laid out the way a morning run-through goes:
+
+- **What's scheduled** — data releases, Fed speakers and Treasury auctions for
+  the week, from FRED's release calendar, the Fed's own `calendar.json` and
+  TreasuryDirect. Earnings are deliberately absent: there is no free, stable,
+  machine-readable source for "the earnings that matter", and a scraped one
+  would rot silently.
+- **Rates and the Fed** — 2y/10y/30y with basis-point moves, 2s10s and 3m10y,
+  the full curve, real yields and breakevens, funding, and what fed funds
+  futures have priced.
+- **Equities and vol** — S&P, Nasdaq, VIX, and which of the eleven sectors led
+  and lagged.
+- **FX** — DXY, EURUSD, USDJPY.
+- **Commodities** — WTI front-month, Brent, gold.
+
+## Fed pricing without FedWatch
+
+CME FedWatch has no free API, but it is derived from 30-day fed funds futures,
+which do. A contract settles at 100 minus the average effective fed funds rate
+over its delivery month, so `100 - price` is the market's expected average EFFR
+for that month.
+
+Quoted by month, not by meeting. A meeting mid-month splits the contract
+between the old rate and the new one, and backing out a per-meeting probability
+means assuming where in the month the change lands. That assumption is where
+FedWatch's precision comes from, and this page does not need it: "25bp of hikes
+priced by Mar 2027" says the same thing without claiming a decimal it has not
+earned.
 
 ## Where the numbers come from
 
@@ -14,11 +45,15 @@ Two providers, chosen per series rather than by habit:
 - **FRED** for the Treasury curve, real yields, breakevens, funding (SOFR,
   EFFR, IORB) and credit spreads. Official, and far more complete — Yahoo
   carries only three Treasury tenors.
-- **Yahoo** for equities, crude, gold and FX. FRED's crude series ran three
+- **Yahoo** for equities, sectors, crude, Brent, gold, FX, the dollar index,
+  VIX and fed funds futures. FRED's crude series ran three
   days behind during a week crude fell ten percent, it carries no free daily
   gold at all, and its FX release runs about nine days in arrears. Used
   through plain `requests`; the payload is a timestamp array and a close
-  array, so yfinance would add a breakage layer and nothing else.
+  array, so yfinance would add a breakage layer and nothing else. History is
+  requested as an explicit date range: `range=max&interval=1d` silently
+  downsamples to monthly, which would not fail loudly in a 60-day rolling
+  correlation — it would just be wrong.
 - **CFTC** for positioning, as before.
 
 Yahoo is unofficial, which is defensible only if it is checked. Every build
